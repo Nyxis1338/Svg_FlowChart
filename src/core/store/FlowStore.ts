@@ -227,28 +227,28 @@ export class FlowStore {
   }
 
   /** 创建节点并自动生成上下左右4个锚点 */
-addNodeWithAnchors(nodeData: Omit<FlowNode, "id">) {
-  const nodeId = uuidv4();
-  // 修复：先构造完整对象再传
-  const node: FlowNode = Object.assign({}, nodeData, { id: nodeId });
-  this.addNode(node);
+  addNodeWithAnchors(nodeData: Omit<FlowNode, "id">) {
+    const nodeId = uuidv4();
+    // 修复：先构造完整对象再传
+    const node: FlowNode = Object.assign({}, nodeData, { id: nodeId });
+    this.addNode(node);
 
-  // 自动生成4向锚点
-  const anchorTypes: StaticAnchorType[] = ["Top", "Right", "Bottom", "Left"];
-  anchorTypes.forEach(dir => {
-    const anchor: AnchorPoint = {
-      id: uuidv4(),
-      nodeId,
-      anchorMode: "static",
-      staticType: dir,
-      direction: dir === "Left" || dir === "Right" ? "input" : "output",
-      radius: 6
-    };
-    this.addAnchorPoint(anchor);
-  });
+    // 自动生成4向锚点
+    const anchorTypes: StaticAnchorType[] = ["Top", "Right", "Bottom", "Left"];
+    anchorTypes.forEach(dir => {
+      const anchor: AnchorPoint = {
+        id: uuidv4(),
+        nodeId,
+        anchorMode: "static",
+        staticType: dir,
+        direction: dir === "Left" || dir === "Right" ? "input" : "output",
+        radius: 6
+      };
+      this.addAnchorPoint(anchor);
+    });
 
-  this.notify("node");
-  return node;
-}
+    this.notify("node");
+    return node;
+  }
 
 }
