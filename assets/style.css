@@ -1,0 +1,51 @@
+body {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+#app {
+  width: 100vw;
+  height: 100vh;
+}
+/* 节点样式 */
+.flow-node {
+  cursor: move;
+}
+.flow-node.selected {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+/* 锚点 */
+.flow-anchor {
+  fill: #ffffff;
+  stroke: #444444;
+  stroke-width: 1.5;
+  cursor: crosshair;
+}
+.flow-anchor.output {
+  fill: #2563eb;
+}
+.flow-anchor.input {
+  fill: #16a34a;
+}
+/* 连线 */
+.connection-path {
+  fill: none;
+  stroke: #333333;
+  stroke-width: 2;
+  cursor: pointer;
+}
+.connection-path:hover {
+  stroke: #2563eb;
+}
+/* 临时拖拽虚线 */
+.temp-connection {
+  fill: none;
+  stroke: #888888;
+  stroke-width: 1.8;
+  stroke-dasharray: 6 4;
+}
+
+svg {
+  user-select: none;
+}
