@@ -50,12 +50,12 @@ DragManager 补充锚点拖拽逻辑：
 3. 连线hover高亮、选中加粗
 4. 多层图层鼠标穿透优化
 
-## 四、配套 README.md 模板（直接丢仓库）
-```markdown
-# Svg_FlowChart
+## 四、配套 README.md 模板
+
+### Svg_FlowChart
 原生TS+SVG自研流程图引擎，无第三方绘图库依赖，轻量化画布工具。
 
-## 功能特性
+### 功能特性
 - ✅ 全屏无限网格画布（仿jsPlumb）
 - ✅ 空格拖拽平移、鼠标滚轮缩放
 - ✅ 节点拖拽移动
@@ -65,7 +65,7 @@ DragManager 补充锚点拖拽逻辑：
 - ✅ TypeScript 完整类型约束
 - ✅ 节点/锚点/连线分级图层渲染
 
-## 快速启动
+## 五、快速启动
 ### 1. 克隆仓库
 ```bash
 git clone https://github.com/Nyxis1338/Svg_FlowChart
