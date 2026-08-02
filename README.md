@@ -99,21 +99,55 @@ npm run build
 
 ## 项目目录
 ```
+```
 Svg_FlowChart
-├─ assets        全局样式
-├─ src
-│  ├─ types       全局TS类型
-│  ├─ utils       DOM、UUID工具
-│  ├─ calc        锚点、连线几何计算
-│  └─ core        画布核心逻辑
-│     ├─ FlowChart.ts     项目入口
-│     ├─ SvgRenderer     SVG渲染
-│     ├─ ViewportManager  视口/网格/缩放平移
-│     ├─ FlowStore        全局状态仓库
-│     └─ DragManager      拖拽交互
-├─ index.html     页面入口
+├─ assets
+│  └─ style.css
+├─ index.html
+├─ package-lock.json
 ├─ package.json
+├─ README.md
+├─ src
+│  ├─ calc
+│  │  ├─ anchor
+│  │  │  ├─ base.ts
+│  │  │  ├─ continuous.ts
+│  │  │  ├─ index.ts
+│  │  │  ├─ perimeter.ts
+│  │  │  └─ static.ts
+│  │  ├─ connector
+│  │  │  ├─ base.ts
+│  │  │  ├─ bezier.ts
+│  │  │  ├─ flowchart.ts
+│  │  │  ├─ index.ts
+│  │  │  └─ straight.ts
+│  │  ├─ geometry.ts
+│  │  └─ index.ts
+│  ├─ core
+│  │  ├─ interaction
+│  │  │  ├─ DragManager.ts
+│  │  │  ├─ EventBus.ts
+│  │  │  └─ HitTest.ts
+│  │  ├─ renderer
+│  │  │  ├─ LayerManager.ts
+│  │  │  └─ SvgRenderer.ts
+│  │  ├─ selection
+│  │  │  └─ SelectionManager.ts
+│  │  ├─ store
+│  │  │  └─ FlowStore.ts
+│  │  ├─ SvgFlowChart.ts
+│  │  └─ viewport
+│  │     └─ ViewportManager.ts
+│  ├─ main.ts
+│  ├─ types
+│  │  ├─ flow-model.ts
+│  │  ├─ geometry.ts
+│  │  └─ index.ts
+│  └─ utils
+│     ├─ dom.ts
+│     └─ uuid.ts
 └─ tsconfig.json
+
 ```
 
 ## 开发计划
@@ -128,3 +162,4 @@ Svg_FlowChart
 ## 六、下一步开发建议
 如果你现在优先做**拖拽连线功能**，我可以直接完整编写 DragManager.ts 锚点拖拽、临时连线、生成连线的全套交互代码；
 需要的话告诉我即可。
+
