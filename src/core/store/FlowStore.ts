@@ -226,29 +226,27 @@ export class FlowStore {
     }
   }
 
-  /** 创建节点并自动生成上下左右4个锚点 */
-  addNodeWithAnchors(nodeData: Omit<FlowNode, "id">) {
-    const nodeId = uuidv4();
-    // 修复：先构造完整对象再传
-    const node: FlowNode = Object.assign({}, nodeData, { id: nodeId });
-    this.addNode(node);
-
-    // 自动生成4向锚点
-    const anchorTypes: StaticAnchorType[] = ["Top", "Right", "Bottom", "Left"];
-    anchorTypes.forEach(dir => {
-      const anchor: AnchorPoint = {
-        id: uuidv4(),
-        nodeId,
-        anchorMode: "static",
-        staticType: dir,
-        direction: dir === "Left" || dir === "Right" ? "input" : "output",
-        radius: 6
-      };
-      this.addAnchorPoint(anchor);
-    });
-
-    this.notify("node");
-    return node;
-  }
+/** 创建节点并自动生成上下左右4个锚点 */
+addNodeWithAnchors(nodeData: Omit<FlowNode, "id">) {
+  const nodeId = uuidv4();
+  const node: FlowNode = Object.assign({}, nodeData, { id: nodeId });
+  this.addNode(node);
+  // 自动生成4向锚点
+  const anchorTypes: StaticAnchorType[] = ["Top", "Right", "Bottom", "Left"];
+  anchorTypes.forEach(dir => {
+    const anchor: AnchorPoint = {
+      id: uuidv4(),
+      nodeId,
+      anchorMode: "static",
+      staticType: dir,
+      // 全部设为output，四个锚点都能拖拽拉出连线
+      direction: "output",
+      radius: 7, // 修改此处即可全局生效
+    };
+    this.addAnchorPoint(anchor);
+  });
+  this.notify("node");
+  return node;
+}
 
 }

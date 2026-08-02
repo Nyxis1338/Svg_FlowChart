@@ -1,213 +1,271 @@
-import { FlowStore } from "../store/FlowStore";
-import { SelectionManager } from "../selection/SelectionManager";
-import { ViewportManager } from "../viewport/ViewportManager";
-import type { Point, Rect } from "../../types/geometry";
+import type { SvgFlowChart } from "../SvgFlowChart";
+import type { FlowStore } from "../store/FlowStore";
+import type { ViewportManager } from "../viewport/ViewportManager";
+import { DragManager } from "../interaction/DragManager";
+import type { SelectionManager } from "../selection/SelectionManager";
+import { createSvgElement, createContextMenu, createMenuItem } from "../../utils/dom";
 import type { AnchorPoint, FlowConnection, FlowNode } from "../../types/flow-model";
-
-type RenderLayerName = "connections" | "anchorPoints" | "nodes";
+import type { Point } from "../../types/geometry";
+import { generatePath } from "../../calc";
 
 export class SvgRenderer {
-  private readonly container: HTMLElement;
-  private svgEl: SVGSVGElement;
-  private viewport: ViewportManager; // 去除?，确定不为空
-  // 四层图层：连线层 -> 拖拽提示圈层 -> 锚点层 -> 节点层
-  private layerConnections: SVGGElement;
-  private layerGrabHint: SVGGElement;
-  private layerAnchorPoints: SVGGElement;
-  private layerNodes: SVGGElement;
-  private store: FlowStore;
-  private selection: SelectionManager;
-  private unsubscribeStore?: () => void;
-  private unsubscribeSelection?: () => void;
-  private unsubscribeViewport?: () => void;
+  private readonly chart: SvgFlowChart;
+  private readonly svgRoot: SVGSVGElement;
+  private readonly store: FlowStore;
+  private readonly viewport: ViewportManager;
+  private readonly dragManager: DragManager;
+  private readonly selection: SelectionManager;
 
-  constructor(
-    container: HTMLElement,
-    svgRoot: SVGSVGElement,
-    store: FlowStore,
-    selection: SelectionManager,
-    viewport: ViewportManager // 改为必填，不再可选
-  ) {
-    this.container = container;
-    this.svgEl = svgRoot;
-    this.store = store;
-    this.selection = selection;
-    this.viewport = viewport;
+  // 渲染图层
+  private connectionLayer: SVGGElement;
+  private anchorLayer: SVGGElement;
+  private nodeLayer: SVGGElement;
 
-    // 初始化图层
-    this.layerConnections = document.createElementNS("http://www.w3.org/2000/svg", "g");
-    this.layerGrabHint = document.createElementNS("http://www.w3.org/2000/svg", "g");
-    this.layerAnchorPoints = document.createElementNS("http://www.w3.org/2000/svg", "g");
-    this.layerNodes = document.createElementNS("http://www.w3.org/2000/svg", "g");
+  // 临时连线DOM缓存
+  private tempLineEl: SVGPathElement | null = null;
 
-    // 直接调用，无undefined风险
-    const canvasGroup = this.viewport.getContentGroup();
-    canvasGroup.appendChild(this.layerConnections);
-    canvasGroup.appendChild(this.layerGrabHint);
-    canvasGroup.appendChild(this.layerAnchorPoints);
-    canvasGroup.appendChild(this.layerNodes);
+  // 右键菜单
+  private contextMenu: HTMLDivElement;
 
-    // 订阅数据变更自动重绘
-    this.unsubscribeStore = this.store.subscribe(() => this.renderAll());
-    this.unsubscribeSelection = this.selection.subscribe(() => this.renderAll());
-    this.unsubscribeViewport = this.viewport.subscribe(() => this.renderAll());
+  constructor(chart: SvgFlowChart) {
+    this.chart = chart;
+    this.svgRoot = chart.getSvgRoot();
+    this.store = chart.store;
+    this.viewport = chart.viewport;
+    this.dragManager = chart.dragManager;
+    this.selection = chart.selection;
 
-    // 首次渲染
-    this.renderAll();
+    // 分层初始化
+    this.connectionLayer = createSvgElement("g") as SVGGElement;
+    this.anchorLayer = createSvgElement("g") as SVGGElement;
+    this.nodeLayer = createSvgElement("g") as SVGGElement;
+
+    const contentGroup = this.viewport.getContentGroup();
+    contentGroup.appendChild(this.connectionLayer);
+    contentGroup.appendChild(this.anchorLayer);
+    contentGroup.appendChild(this.nodeLayer);
+
+    // 右键菜单初始化
+    this.contextMenu = createContextMenu();
+    document.body.appendChild(this.contextMenu);
+
+    // 右键监听
+    this.svgRoot.addEventListener("contextmenu", this.onContextMenu.bind(this));
+    document.addEventListener("mousedown", this.hideContextMenu.bind(this));
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") this.hideContextMenu();
+    });
+
+    // 点击空白画布清空选择
+    this.svgRoot.addEventListener("mousedown", () => {    
+      this.selection.clear();
+    });
+    // 数据订阅重绘
+    this.store.subscribe(() => this.renderAll());
+    this.selection.subscribe(() => this.renderAll());
   }
 
-  /** 全量重绘所有画布元素 */
   renderAll() {
-    this.clearAllLayers();
     this.renderConnections();
-    this.renderGrabHints();
     this.renderAnchorPoints();
     this.renderNodes();
   }
 
-  private clearAllLayers() {
-    this.layerConnections.innerHTML = "";
-    this.layerGrabHint.innerHTML = "";
-    this.layerAnchorPoints.innerHTML = "";
-    this.layerNodes.innerHTML = "";
-  }
 
-  // 渲染节点
   private renderNodes() {
+    this.nodeLayer.innerHTML = "";
     const nodes = this.store.getAllNodes();
-    const selectInfo = this.selection.getSelection();
+    const selected = this.selection.getSelection();
+
     for (const node of nodes) {
-      const g = this.createNodeGroup(node, selectInfo);
-      this.layerNodes.appendChild(g);
-    }
-  }
+      const g = createSvgElement("g") as SVGGElement;
+      // 改用 setAttribute 兼容SVG dataset
+      g.setAttribute("data-node-id", node.id);
 
-  private createNodeGroup(node: FlowNode, selectInfo: ReturnType<SelectionManager["getSelection"]>): SVGGElement {
-    const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
-    g.dataset.nodeId = node.id;
+      // 【关键】删除 e.stopPropagation()，否则svg根收不到mousedown
+      const rect = createSvgElement("rect") as SVGRectElement;
+      rect.setAttribute("x", String(node.x));
+      rect.setAttribute("y", String(node.y));
+      rect.setAttribute("width", String(node.width));
+      rect.setAttribute("height", String(node.height));
+      rect.setAttribute("rx", "6");
+      rect.setAttribute("fill", "#ffffff");
 
-    const isActive = selectInfo.type === "node" && selectInfo.id === node.id;
-    const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-    rect.setAttribute("x", String(node.x));
-    rect.setAttribute("y", String(node.y));
-    rect.setAttribute("width", String(node.width));
-    rect.setAttribute("height", String(node.height));
-    rect.setAttribute("rx", "6");
-    rect.setAttribute("fill", "#ffffff");
-    rect.setAttribute("stroke", isActive ? "#2563eb" : "#666");
-    rect.setAttribute("stroke-width", isActive ? "2.2" : "1.5");
-    g.appendChild(rect);
-
-    if (node.label) {
-      const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
-      const centerX = node.x + node.width / 2;
-      const centerY = node.y + node.height / 2;
-      text.setAttribute("x", String(centerX));
-      text.setAttribute("y", String(centerY));
-      text.setAttribute("text-anchor", "middle");
-      text.setAttribute("dominant-baseline", "middle");
-      text.setAttribute("font-size", "13");
-      text.setAttribute("fill", "#222");
-      text.textContent = node.label;
-      g.appendChild(text);
-    }
-    return g;
-  }
-
-  // 渲染锚点
-  private renderAnchorPoints() {
-    const allAp = this.store.getAllAnchorPoints();
-    const selectInfo = this.selection.getSelection();
-    for (const ap of allAp) {
-      const node = this.store.getNode(ap.nodeId);
-      if (!node) continue;
-      const pos = this.store.calcAnchorPos(node, ap);
-      const isActive = selectInfo.type === "anchorPoint" && selectInfo.id === ap.id;
-
-      const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
-      g.dataset.anchorId = ap.id;
-
-      if (isActive) {
-        const outer = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-        outer.setAttribute("cx", String(pos.x));
-        outer.setAttribute("cy", String(pos.y));
-        outer.setAttribute("r", String((ap.radius ?? 6) + 3));
-        outer.setAttribute("fill", "none");
-        outer.setAttribute("stroke", "#2563eb");
-        outer.setAttribute("stroke-width", "1.5");
-        g.appendChild(outer);
+      if (this.selection.isSelected("node", node.id)) {
+        rect.setAttribute("stroke", "#ff6622");
+        rect.setAttribute("stroke-width", "3");
+      } else {
+        rect.setAttribute("stroke", "#5588dd");
+        rect.setAttribute("stroke-width", "2");
       }
 
-      const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-      circle.setAttribute("cx", String(pos.x));
-      circle.setAttribute("cy", String(pos.y));
-      circle.setAttribute("r", String(ap.radius ?? 6));
-      circle.setAttribute("fill", ap.fill ?? "#3b82f6");
-      circle.setAttribute("stroke", ap.stroke ?? "#fff");
-      circle.setAttribute("stroke-width", "1.2");
-      g.appendChild(circle);
-      this.layerAnchorPoints.appendChild(g);
+      rect.addEventListener("mousedown", (e) => {
+        e.stopPropagation();
+        this.selection.select("node", node.id);
+      });
+
+      const text = createSvgElement("text") as SVGTextElement;
+      text.setAttribute("x", String(node.x + node.width / 2));
+      text.setAttribute("y", String(node.y + node.height / 2 + 6));
+      text.setAttribute("text-anchor", "middle");
+      text.setAttribute("fill", "#222222");
+      text.setAttribute("font-size", "14");
+      text.textContent = node.label ?? "";
+
+      g.appendChild(rect);
+      g.appendChild(text);
+      this.nodeLayer.appendChild(g);
     }
   }
 
-  // 渲染连线
-  private renderConnections() {
-    const connections = this.store.getAllConnections();
-    const selectInfo = this.selection.getSelection();
-    for (const conn of connections) {
-      const pathInfo = this.store.computeConnectionPath(conn);
-      if (!pathInfo) continue;
-      const isActive = selectInfo.type === "connection" && selectInfo.id === conn.id;
+private renderAnchorPoints() {
+  this.anchorLayer.innerHTML = "";
+  const anchors = this.store.getAllAnchorPoints();
+  for (const ap of anchors) {
+    const node = this.store.getNode(ap.nodeId);
+    if (!node) continue;
+    const pos: Point = this.store.calcAnchorPos(node, ap);
+    const circle = createSvgElement("circle") as SVGCircleElement;
+    circle.setAttribute("cx", String(pos.x));
+    circle.setAttribute("cy", String(pos.y));
+    circle.setAttribute("r", String(ap.radius));
+    circle.setAttribute("fill", "#4285f4");
+    circle.style.cursor = "crosshair";
+    circle.dataset["anchorId"] = ap.id;
+    // 仅调用拖拽，禁止stopPropagation，保证window.mousemove接收鼠标移动
+    circle.addEventListener("mousedown", (e) => {
+      this.dragManager.startLinkDrag(ap, e);
+    });
+    this.anchorLayer.appendChild(circle);
+  }
+}
 
-      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-      path.dataset.connectionId = conn.id;
-      path.setAttribute("d", pathInfo.pathD);
-      path.setAttribute("fill", "none");
-      path.setAttribute("stroke", isActive ? "#2563eb" : (conn.stroke ?? "#444"));
-      path.setAttribute("stroke-width", String(isActive ? (conn.strokeWidth ?? 2) + 0.6 : (conn.strokeWidth ?? 2)));
-      path.setAttribute("stroke-linecap", "round");
-      this.layerConnections.appendChild(path);
+private renderConnections() {
+  this.connectionLayer.innerHTML = "";
+  const connections = this.store.getAllConnections();
+  for (const conn of connections) {
+    const pathInfo = this.store.computeConnectionPath(conn);
+    if (!pathInfo) continue;
+    const path = createSvgElement("path") as SVGPathElement;
+    path.setAttribute("d", pathInfo.pathD);
+    path.setAttribute("fill", "none");
+    path.setAttribute("stroke", conn.stroke ?? "#666");
+    path.setAttribute("stroke-width", String(conn.strokeWidth ?? 2));
+    path.dataset["connectionId"] = conn.id;
+    // 点击连线选中，阻止冒泡到画布清空选择
+    path.addEventListener("mousedown", (e) => {
+      e.stopPropagation();
+      this.selection.select("connection", conn.id);
+    });
+    this.connectionLayer.appendChild(path);
+  }
+}
+
+  // 更新临时虚线
+setTempLine(pos: { x1: number; y1: number; x2: number; y2: number }) {
+  if (!this.tempLineEl) {
+    this.tempLineEl = createSvgElement("path") as SVGPathElement;
+    this.tempLineEl.setAttribute("stroke", "#000000");
+    this.tempLineEl.setAttribute("stroke-width", "2.5");
+    this.tempLineEl.setAttribute("fill", "none");
+    this.tempLineEl.setAttribute("stroke-dasharray", "8 4");
+    this.tempLineEl.setAttribute("pointer-events", "none");
+    this.connectionLayer.appendChild(this.tempLineEl);
+  }
+  // 临时拖拽虚线：固定直线，不要流程图折线，对齐jsPlumb拖拽视觉
+  const dStr = `M${pos.x1} ${pos.y1} L${pos.x2} ${pos.y2}`;
+  this.tempLineEl.setAttribute("d", dStr);
+}
+
+clearTempLine() {
+  if (this.tempLineEl) {
+    this.tempLineEl.remove();
+    this.tempLineEl = null;
+  }
+}
+
+  // 右键菜单事件
+  private onContextMenu(evt: MouseEvent) {
+    evt.preventDefault();
+    const target = evt.target as SVGElement;
+    const mouseX = evt.clientX;
+    const mouseY = evt.clientY;
+    const canvasPos = this.viewport.screenToCanvas({ x: mouseX, y: mouseY });
+
+    this.contextMenu.innerHTML = "";
+
+    const nodeId = (target.parentElement?.dataset["nodeId"]) || target.dataset["nodeId"];
+    const connId = target.dataset["connectionId"];
+
+    if (nodeId) {
+      const node = this.store.getNode(nodeId);
+      if (node) {
+        const copyItem = createMenuItem("复制节点", () => {
+          this.store.addNodeWithAnchors({
+            x: node.x + 30,
+            y: node.y + 30,
+            width: node.width,
+            height: node.height,
+            label: node.label + " (副本)"
+          });
+          this.hideContextMenu();
+        });
+        const delItem = createMenuItem("删除节点", () => {
+          this.store.deleteSelected("node", nodeId);
+          this.selection.clear();
+          this.hideContextMenu();
+        });
+        this.contextMenu.appendChild(copyItem);
+        this.contextMenu.appendChild(delItem);
+      }
+    } else if (connId) {
+      const delItem = createMenuItem("删除连线", () => {
+        this.store.deleteSelected("connection", connId);
+        this.selection.clear();
+        this.hideContextMenu();
+      });
+      this.contextMenu.appendChild(delItem);
+    } else {
+      const addItem = createMenuItem("新增节点", () => {
+        this.store.addNodeWithAnchors({
+          x: canvasPos.x,
+          y: canvasPos.y,
+          width: 140,
+          height: 80,
+          label: "新节点"
+        });
+        this.hideContextMenu();
+      });
+      this.contextMenu.appendChild(addItem);
     }
+
+    // 边界避让
+    const menuW = 130;
+    const menuH = 120;
+    let left = mouseX;
+    let top = mouseY;
+    if (mouseX + menuW > window.innerWidth) left = mouseX - menuW;
+    if (mouseY + menuH > window.innerHeight) top = mouseY - menuH;
+
+    this.contextMenu.style.left = left + "px";
+    this.contextMenu.style.top = top + "px";
+    this.contextMenu.style.display = "block";
   }
 
-  // 渲染连线两端拖拽提示小圆（仅锚点连线生效，连续节点连线不渲染）
-  private renderGrabHints() {
-    const connections = this.store.getAllConnections();
-    for (const conn of connections) {
-      if (conn.sourceNodeId || conn.targetNodeId) continue;
-      const pathInfo = this.store.computeConnectionPath(conn);
-      if (!pathInfo) continue;
-
-      const c1 = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-      c1.setAttribute("cx", String(pathInfo.start.x));
-      c1.setAttribute("cy", String(pathInfo.start.y));
-      c1.setAttribute("r", "4");
-      c1.setAttribute("fill", "#2563eb");
-      c1.setAttribute("opacity", "0.6");
-      this.layerGrabHint.appendChild(c1);
-
-      const c2 = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-      c2.setAttribute("cx", String(pathInfo.end.x));
-      c2.setAttribute("cy", String(pathInfo.end.y));
-      c2.setAttribute("r", "4");
-      c2.setAttribute("fill", "#2563eb");
-      c2.setAttribute("opacity", "0.6");
-      this.layerGrabHint.appendChild(c2);
-    }
-  }
-
-  getSvgElement(): SVGSVGElement {
-    return this.svgEl;
+  private hideContextMenu() {
+    this.contextMenu.style.display = "none";
   }
 
   destroy() {
-    if (this.unsubscribeStore) this.unsubscribeStore();
-    if (this.unsubscribeSelection) this.unsubscribeSelection();
-    if (this.unsubscribeViewport) this.unsubscribeViewport();
-    this.svgEl.remove();
+    this.connectionLayer.innerHTML = "";
+    this.nodeLayer.innerHTML = "";
+    this.anchorLayer.innerHTML = "";
+    this.tempLineEl = null;
+    this.contextMenu.remove();
   }
 
-  refresh() {
-    this.renderAll();
+  // 调试用：返回临时线是否存在
+  getTempLineExists(): boolean {
+    return !!this.tempLineEl;
   }
 }

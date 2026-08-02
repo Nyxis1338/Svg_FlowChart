@@ -1,6 +1,8 @@
-import { FlowChart } from "./core/FlowChart";
-const appDom = document.getElementById("app")!;
-const chart = new FlowChart(appDom);
+import { SvgFlowChart } from "./core/SvgFlowChart";
+const appDom = document.getElementById("canvas-container")!;
+const chart = new SvgFlowChart(appDom);
+// 挂载到全局window，控制台可直接访问
+(window as any).chart = chart;
 const { store } = chart;
 
 // ============ 测试数据初始化（统一使用addNodeWithAnchors自动生成四向锚端点） ============
@@ -26,14 +28,11 @@ const node3 = store.addNodeWithAnchors({
   label: "节点C"
 });
 
-// 【可选】原有手动锚点+连线代码可以删掉，现在每个节点自带4个锚端点
-// 如果你想保留那条默认连线，我给你配套改造代码，不需要手动新建ap：
-/*
-// 示例：取节点A右锚、节点B左锚创建连线
+// 自动取节点A右锚、节点B左锚创建连线
 const allAps = store.getAllAnchorPoints();
 const aRight = allAps.find(ap => ap.nodeId === node1.id && ap.staticType === "Right");
-const bLeft = allAps.find(ap => ap.nodeId === node2 && ap.staticType === "Left");
-if(aRight && bLeft) {
+const bLeft = allAps.find(ap => ap.nodeId === node2.id && ap.staticType === "Left");
+if (aRight && bLeft) {
   store.addConnection({
     id: crypto.randomUUID(),
     connectorType: "flowchart",
@@ -41,9 +40,9 @@ if(aRight && bLeft) {
     targetAnchorId: bLeft.id,
     stroke: "#333",
     strokeWidth: 2
-  })
+  });
 }
-*/
+
 
 console.log("✅ 自研SVG流程图引擎初始化完成");
 console.log("操作说明：");
