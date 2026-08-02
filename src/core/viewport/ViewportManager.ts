@@ -137,30 +137,24 @@ export class ViewportManager {
    * @param point clientX/clientY 屏幕坐标
    * @returns 纯业务坐标，与节点x/y、锚点计算同一坐标系
    */
-  screenToCanvas(point: Point): Point {
-    // 1. 获取Surface容器DOM边界
-    const surfaceRect = this.contentGroup.getBoundingClientRect();
-    // 2. 转换为Surface容器内部相对坐标
-    const surfaceX = point.x - surfaceRect.left;
-    const surfaceY = point.y - surfaceRect.top;
-    // 3. 抵消平移、缩放，还原原始业务逻辑坐标
-    const logicX = (surfaceX - this.translate.x) / this.scale;
-    const logicY = (surfaceY - this.translate.y) / this.scale;
-    return { x: logicX, y: logicY };
-  }
 
-  /**
-   * 画布业务逻辑坐标 → 屏幕像素坐标（渲染反向换算）
-   */
-  canvasToScreen(point: Point): Point {
-    const surfaceRect = this.contentGroup.getBoundingClientRect();
-    const surfaceX = point.x * this.scale + this.translate.x;
-    const surfaceY = point.y * this.scale + this.translate.y;
-    return {
-      x: surfaceX + surfaceRect.left,
-      y: surfaceY + surfaceRect.top
-    };
-  }
+  
+
+/** 屏幕client坐标 → 画布业务逻辑坐标（正确公式，无超大偏移） */
+screenToCanvas(point: Point): Point {
+  return {
+    x: (point.x - this.translate.x) / this.scale,
+    y: (point.y - this.translate.y) / this.scale
+  };
+}
+
+/** 画布业务逻辑坐标 → 屏幕client坐标 */
+canvasToScreen(point: Point): Point {
+  return {
+    x: point.x * this.scale + this.translate.x,
+    y: point.y * this.scale + this.translate.y
+  };
+}
 
   isSpaceActive(): boolean {
     return this.spacePressed;
