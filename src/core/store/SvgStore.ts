@@ -1,9 +1,9 @@
 import type { Point, Rect } from "../../types/geometry";
-import type { AnchorPoint, FlowNode, FlowConnection } from "../../types/flow-model";
+import type { AnchorPoint, FlowNode, FlowConnection } from "../../types/SvgModel";
+import { NodeShape } from "../../types/SvgModel";
 import { getContinuousAnchorPair, getStaticAnchor, getPerimeterAnchor, generatePath, ConnectorMode } from "../../calc";
 import { uuidv4 } from "../../utils/uuid";
 import type { StaticAnchorType } from "../../calc/anchor";
-
 
 type StoreChangeType = "node" | "anchorPoint" | "connection";
 type StoreChangeListener = (type: StoreChangeType) => void;
@@ -11,8 +11,9 @@ type SelectableType = "node" | "anchorPoint" | "connection" | null;
 
 /**
  * 流程图状态仓库
+ * 管理所有节点、锚点、连线的数据，并负责通知视图更新
  */
-export class FlowStore {
+export class SvgStore {
   // 数据集
   private nodes = new Map<string, FlowNode>();
   private anchorPoints = new Map<string, AnchorPoint>();
@@ -117,13 +118,19 @@ export class FlowStore {
       return pt;
     }
     if (ap.anchorMode === "perimeter") {
-      let pt = getPerimeterAnchor(nodeRect, ap.perimeterTotal!, ap.perimeterIndex!);
-      if (ap.offset) {
-        pt = { x: pt.x + ap.offset.x, y: pt.y + ap.offset.y };
+      // 如果 perimeterTotal 和 perimeterIndex 存在，使用它们
+      if (ap.perimeterTotal !== undefined && ap.perimeterIndex !== undefined) {
+        let pt = getPerimeterAnchor(nodeRect, ap.perimeterTotal, ap.perimeterIndex);
+        if (ap.offset) {
+          pt = { x: pt.x + ap.offset.x, y: pt.y + ap.offset.y };
+        }
+        return pt;
       }
-      return pt;
+      // 否则返回节点中心作为降级方案
+      return { x: nodeRect.x + nodeRect.width / 2, y: nodeRect.y + nodeRect.height / 2 };
     }
-    return { x: 0, y: 0 };
+    // 默认返回节点中心
+    return { x: nodeRect.x + nodeRect.width / 2, y: nodeRect.y + nodeRect.height / 2 };
   }
 
   // ===================== Connection 连线 =====================
@@ -145,7 +152,6 @@ export class FlowStore {
   getAllConnections(): FlowConnection[] {
     return [...this.connections.values()].map(c => structuredClone(c));
   }
-
 
   updateConnection(connId: string, patch: Partial<FlowConnection>) {
     const conn = this.connections.get(connId);
@@ -213,8 +219,8 @@ export class FlowStore {
     this.notify("node");
   }
 
-    /**
-   根据选中类型删除元素，自动级联清理
+  /**
+   * 根据选中类型删除元素，自动级联清理
    */
   deleteSelected(type: SelectableType, id: string) {
     if (type === "node") {
@@ -226,27 +232,44 @@ export class FlowStore {
     }
   }
 
-/** 创建节点并自动生成上下左右4个锚点 */
-addNodeWithAnchors(nodeData: Omit<FlowNode, "id">) {
-  const nodeId = uuidv4();
-  const node: FlowNode = Object.assign({}, nodeData, { id: nodeId });
-  this.addNode(node);
-  // 自动生成4向锚点
-  const anchorTypes: StaticAnchorType[] = ["Top", "Right", "Bottom", "Left"];
-  anchorTypes.forEach(dir => {
-    const anchor: AnchorPoint = {
-      id: uuidv4(),
-      nodeId,
-      anchorMode: "static",
-      staticType: dir,
-      // 全部设为output，四个锚点都能拖拽拉出连线
-      direction: "output",
-      radius: 7, // 修改此处即可全局生效
+  /**
+   * 创建节点并自动生成上下左右4个固定锚点
+   * @param nodeData 节点数据（不含id），可包含 shape 等属性
+   * @returns 创建的节点对象
+   */
+  addNodeWithAnchors(nodeData: Omit<FlowNode, "id">) {
+    const nodeId = uuidv4();
+    const node: FlowNode = {
+      ...nodeData,
+      id: nodeId,
+      // 设置默认形状（如果未指定）
+      shape: nodeData.shape || NodeShape.RECTANGLE,
+      // 设置默认样式
+      fill: nodeData.fill || "#ffffff",
+      stroke: nodeData.stroke || "#5588dd",
+      strokeWidth: nodeData.strokeWidth || 2,
     };
-    this.addAnchorPoint(anchor);
-  });
-  this.notify("node");
-  return node;
-}
+    this.addNode(node);
 
+    // 自动生成4个固定锚点（static模式）
+    const anchorTypes: StaticAnchorType[] = ["Top", "Right", "Bottom", "Left"];
+    const directions: ("input" | "output")[] = ["output", "output", "input", "input"];
+    anchorTypes.forEach((dir, idx) => {
+      const anchor: AnchorPoint = {
+        id: uuidv4(),
+        nodeId,
+        anchorMode: "static",
+        staticType: dir,
+        direction: directions[idx % directions.length],
+        radius: 7,
+        fill: "#4285f4",
+        stroke: "#ffffff",
+        offset: { x: 0, y: 0 },
+      };
+      this.addAnchorPoint(anchor);
+    });
+
+    this.notify("node");
+    return node;
+  }
 }

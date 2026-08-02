@@ -1,17 +1,17 @@
 import type { Point } from "../../types/geometry";
 import { createSvgElement } from "../../utils/dom";
+
 export class ViewportManager {
   public readonly svg: SVGSVGElement;
-  // Surface基准容器：所有业务坐标基准，transform仅作用于此
   public readonly contentGroup: SVGGElement;
   private gridLayer: SVGGElement;
 
-  // PanZoom变换参数（仅视觉，不修改业务数据）
-  private translate: Point = { x: 0, y: 0 };
-  private scale = 1;
+  // 改为 public 以便外部读取，但通过方法修改以触发变更
+  public translate: Point = { x: 0, y: 0 };
+  public scale = 1;
+
   private spacePressed = false;
   private dragStart: Point | null = null;
-
   private viewChangeCallbacks: Array<() => void> = [];
   private readonly gridSize = 20;
   private readonly gridColor = "#e5e7eb";
@@ -21,7 +21,6 @@ export class ViewportManager {
     this.svg.style.width = "100%";
     this.svg.style.height = "100%";
 
-    // Surface基准层
     this.contentGroup = createSvgElement("g") as SVGGElement;
     this.gridLayer = createSvgElement("g") as SVGGElement;
     this.renderGrid();
@@ -39,8 +38,27 @@ export class ViewportManager {
       if (idx > -1) this.viewChangeCallbacks.splice(idx, 1);
     };
   }
-  private triggerChange() {
+
+  // 公开触发变更，供外部调用
+  public triggerChange() {
     this.viewChangeCallbacks.forEach(cb => cb());
+  }
+
+  // 公共设置方法：设置平移和缩放
+  public setTransform(tx: number, ty: number, scale: number): void {
+    this.translate.x = tx;
+    this.translate.y = ty;
+    this.scale = Math.max(0.3, Math.min(3, scale));
+    this.applyTransform();
+    this.triggerChange();
+  }
+
+  public getTranslate(): Point {
+    return { ...this.translate };
+  }
+
+  public getScale(): number {
+    return this.scale;
   }
 
   private renderGrid() {
@@ -85,6 +103,7 @@ export class ViewportManager {
       this.svg.style.cursor = "grab";
     }
   }
+
   private onKeyUp(e: KeyboardEvent) {
     if (e.code === "Space") {
       this.spacePressed = false;
@@ -92,11 +111,13 @@ export class ViewportManager {
       this.svg.style.cursor = "";
     }
   }
+
   private onMouseDown(e: MouseEvent) {
     if (!this.spacePressed) return;
     this.dragStart = { x: e.clientX, y: e.clientY };
     this.svg.style.cursor = "grabbing";
   }
+
   private onMouseMove(e: MouseEvent) {
     if (!this.spacePressed || !this.dragStart) {
       this.svg.style.cursor = "";
@@ -111,6 +132,7 @@ export class ViewportManager {
     this.applyTransform();
     this.triggerChange();
   }
+
   private onWheel(e: WheelEvent) {
     e.preventDefault();
     const zoomSpeed = 0.08;
@@ -126,42 +148,33 @@ export class ViewportManager {
     this.triggerChange();
   }
 
-  // 应用PanZoom变换，仅作用Surface容器（复刻jsPlumb）
   private applyTransform() {
     this.contentGroup.setAttribute("transform", `translate(${this.translate.x} ${this.translate.y}) scale(${this.scale})`);
   }
 
-  // ========== 标准化坐标转换（核心，全局唯一转换方法）==========
-  /**
-   * 屏幕像素坐标 → 画布业务逻辑坐标（基准：contentGroup左上角(0,0)，完全对齐jsPlumb）
-   * @param point clientX/clientY 屏幕坐标
-   * @returns 纯业务坐标，与节点x/y、锚点计算同一坐标系
-   */
+  // ========== 坐标转换 ==========
+  screenToCanvas(point: Point): Point {
+    return {
+      x: (point.x - this.translate.x) / this.scale,
+      y: (point.y - this.translate.y) / this.scale
+    };
+  }
 
-  
-
-/** 屏幕client坐标 → 画布业务逻辑坐标（正确公式，无超大偏移） */
-screenToCanvas(point: Point): Point {
-  return {
-    x: (point.x - this.translate.x) / this.scale,
-    y: (point.y - this.translate.y) / this.scale
-  };
-}
-
-/** 画布业务逻辑坐标 → 屏幕client坐标 */
-canvasToScreen(point: Point): Point {
-  return {
-    x: point.x * this.scale + this.translate.x,
-    y: point.y * this.scale + this.translate.y
-  };
-}
+  canvasToScreen(point: Point): Point {
+    return {
+      x: point.x * this.scale + this.translate.x,
+      y: point.y * this.scale + this.translate.y
+    };
+  }
 
   isSpaceActive(): boolean {
     return this.spacePressed;
   }
+
   getContentGroup(): SVGGElement {
     return this.contentGroup;
   }
+
   destroy() {
     window.removeEventListener("keydown", this.onKeyDown.bind(this));
     window.removeEventListener("keyup", this.onKeyUp.bind(this));

@@ -1,6 +1,15 @@
 import type { Point, Rect } from "../../types/geometry";
+import type { FlowNode } from "../../types/SvgModel";
 import { Geometry } from "../geometry";
 
+/**
+ * 计算连续锚点（Continuous Anchor）的一对坐标
+ * 该算法会遍历源节点和目标节点的四条边，找到距离最近的一对点作为连线端点
+ * 
+ * @param sourceRect 源节点的矩形区域
+ * @param targetRect 目标节点的矩形区域
+ * @returns 包含源端点和目标端点的坐标对象
+ */
 export function computeContinuousAnchor(sourceRect: Rect, targetRect: Rect): {
   source: Point;
   target: Point;
@@ -21,6 +30,7 @@ export function computeContinuousAnchor(sourceRect: Rect, targetRect: Rect): {
       const [tA, tB] = te;
       const candidates: Array<{ sp: Point; tp: Point }> = [];
 
+      // 候选点组合：线段端点互投影
       candidates.push({ sp: sA, tp: Geometry.projectPointOnSegment(sA, tA, tB) });
       candidates.push({ sp: sB, tp: Geometry.projectPointOnSegment(sB, tA, tB) });
       candidates.push({ sp: Geometry.projectPointOnSegment(tA, sA, sB), tp: tA });
@@ -41,4 +51,11 @@ export function computeContinuousAnchor(sourceRect: Rect, targetRect: Rect): {
     source: { ...bestSource },
     target: { ...bestTarget }
   };
+}
+
+/**
+ * 重载：支持直接传入 FlowNode 对象
+ */
+export function computeContinuousAnchorFromNodes(sourceNode: FlowNode, targetNode: FlowNode) {
+  return computeContinuousAnchor(sourceNode, targetNode);
 }

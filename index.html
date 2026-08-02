@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Svg_FlowChart</title>
+  <title>Svg_FlowChart 功能测试</title>
   <style>
     * {
       margin: 0;
@@ -13,14 +13,16 @@
     body {
       padding: 20px;
       background: #f0f2f5;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     }
-    /* 画布容器单独区域 */
     #canvas-container {
       width: 100%;
       height: 700px;
       border: 2px solid #ccc;
       background: #fff;
       overflow: hidden;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     }
     svg {
       display: block;
@@ -28,25 +30,111 @@
       height: 100%;
       user-select: none;
     }
-    /* 按钮悬浮层 */
+    /* 工具栏 */
     .tool-bar {
       position: fixed;
-      top: 16px;
-      left: 16px;
+      top: 20px;
+      left: 20px;
       z-index: 999;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      background: rgba(255,255,255,0.9);
+      padding: 12px 16px;
+      border-radius: 8px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+      backdrop-filter: blur(4px);
+      max-width: 95%;
     }
-    #addNodeBtn {
+    .tool-bar button {
       padding: 6px 14px;
       cursor: pointer;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      background: #fff;
+      font-size: 13px;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+    .tool-bar button:hover {
+      background: #e3f2fd;
+      border-color: #1976d2;
+    }
+    .tool-bar .separator {
+      width: 1px;
+      background: #ddd;
+      margin: 0 4px;
+    }
+    .tool-bar .label {
+      font-size: 13px;
+      color: #555;
+      display: flex;
+      align-items: center;
+      padding: 0 4px;
+    }
+    /* 快捷键提示 */
+    .shortcuts {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.75);
+      color: #eee;
+      padding: 8px 20px;
+      border-radius: 20px;
+      font-size: 13px;
+      z-index: 999;
+      pointer-events: none;
+      text-align: center;
+      backdrop-filter: blur(4px);
+    }
+    .shortcuts code {
+      background: rgba(255,255,255,0.15);
+      padding: 1px 8px;
+      border-radius: 4px;
+      margin: 0 4px;
+      font-family: monospace;
+    }
+    @media (max-width: 768px) {
+      .tool-bar {
+        top: 10px;
+        left: 10px;
+        padding: 8px 10px;
+        gap: 4px;
+      }
+      .tool-bar button {
+        font-size: 11px;
+        padding: 4px 10px;
+      }
+      .shortcuts {
+        font-size: 11px;
+        padding: 4px 12px;
+        bottom: 10px;
+        max-width: 90%;
+      }
     }
   </style>
 </head>
 <body>
   <div class="tool-bar">
-    <button id="addNodeBtn">新增节点</button>
+    <button id="addNodeBtn">➕ 新增节点</button>
+    <span class="separator"></span>
+    <button id="zoomInBtn">🔍+ 放大</button>
+    <button id="zoomOutBtn">🔍- 缩小</button>
+    <button id="resetViewBtn">⟲ 重置视图</button>
+    <button id="fitViewBtn">⊡ 适配视图</button>
+    <span class="separator"></span>
+    <button id="exportBtn">📤 导出JSON</button>
+    <button id="importBtn">📥 导入JSON</button>
+    <button id="clearAllBtn" style="background:#fce4ec;border-color:#c62828;">🗑 清空</button>
   </div>
-  <!-- 独立画布容器 -->
+
   <div id="canvas-container"></div>
+
+  <div class="shortcuts">
+    <code>空格+拖拽</code> 平移 · <code>滚轮</code> 缩放 · <code>拖拽锚点</code> 创建连线 · <code>Delete</code> 删除选中 · <code>ESC</code> 取消拖拽
+  </div>
+
   <script type="module" src="./src/main.ts"></script>
 </body>
 </html>
