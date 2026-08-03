@@ -42,9 +42,10 @@ export class SvgRenderer {
     this.nodeLayer = createSvgElement("g") as SVGGElement;
 
     const contentGroup = this.viewport.getContentGroup();
+    // 图层顺序：节点在下，连线中间，锚点在上
+    contentGroup.appendChild(this.nodeLayer);
     contentGroup.appendChild(this.connectionLayer);
     contentGroup.appendChild(this.anchorLayer);
-    contentGroup.appendChild(this.nodeLayer);
 
     // 右键菜单初始化
     this.contextMenu = createContextMenu();
@@ -192,9 +193,8 @@ export class SvgRenderer {
       const node = this.store.getNode(ap.nodeId);
       if (!node) continue;
 
-      const pos = this.store.calcAnchorPos(node, ap);
+      const pos = this.store.calcAnchorPosForNode(node, ap);
 
-      // 创建锚点元素（圆点）
       const circle = createSvgElement("circle") as SVGCircleElement;
       circle.setAttribute("cx", String(pos.x));
       circle.setAttribute("cy", String(pos.y));
@@ -202,26 +202,23 @@ export class SvgRenderer {
       circle.style.cursor = "crosshair";
       circle.dataset["anchorId"] = ap.id;
 
-      // 判断锚点模式：static 显示可见，perimeter 显示透明交互区
       if (ap.anchorMode === "perimeter") {
         // 连续锚点：透明交互区（不可见但可点击）
         circle.setAttribute("fill", "transparent");
         circle.setAttribute("stroke", "transparent");
         circle.setAttribute("fill-opacity", "0");
-        // 适当放大交互半径，提高易用性
+        // 放大交互半径
         circle.setAttribute("r", String((ap.radius || 6) * 2));
       } else {
         // 固定锚点（static）：可见样式
         circle.setAttribute("fill", ap.fill || "#4285f4");
         circle.setAttribute("stroke", ap.stroke || "#ffffff");
         circle.setAttribute("stroke-width", "2");
-        // 保持原有半径
         circle.setAttribute("r", String(ap.radius || 6));
       }
 
-      // 事件绑定：启动锚点拖拽连线
       circle.addEventListener("mousedown", (e) => {
-        e.stopPropagation(); // 防止触发其他拖拽
+        e.stopPropagation();
         this.dragManager.startLinkDrag(ap, e);
       });
 
@@ -249,16 +246,15 @@ export class SvgRenderer {
       const isSelected = this.selection.isSelected("connection", conn.id);
       path.setAttribute("stroke", isSelected ? "#ff6622" : (conn.stroke || "#666666"));
       path.setAttribute("stroke-width", String(isSelected ? 4 : (conn.strokeWidth || 2)));
-      // 添加鼠标 hover 高亮效果（可选，通过 CSS）
       g.appendChild(path);
 
-      // ---- 2. 绘制标签（如果配置了） ----
+      // ---- 2. 绘制标签 ----
       if (conn.label) {
         const labelEl = this.renderLabel(conn.label, pathInfo);
         if (labelEl) g.appendChild(labelEl);
       }
 
-      // ---- 3. 绘制箭头（如果配置了） ----
+      // ---- 3. 绘制箭头 ----
       if (conn.arrow && conn.arrow.direction !== ArrowDirection.NONE) {
         const arrowEl = this.renderArrow(conn.arrow, pathInfo, conn.stroke);
         if (arrowEl) g.appendChild(arrowEl);
@@ -276,7 +272,6 @@ export class SvgRenderer {
 
   /**
    * 渲染连线标签
-   * 在连线中点附近绘制文本，支持偏移
    */
   private renderLabel(label: LabelConfig, pathInfo: { start: Point; end: Point; pathD: string }): SVGTextElement | null {
     const mid = this.getPathMidPoint(pathInfo.start, pathInfo.end);
@@ -290,13 +285,11 @@ export class SvgRenderer {
     text.setAttribute("font-size", String(label.fontSize || 12));
     text.setAttribute("font-family", "sans-serif");
     text.textContent = label.text;
-    // 设置背景（可选），但为了简洁，这里只渲染文本
     return text;
   }
 
   /**
-   * 渲染连线箭头
-   * 根据箭头配置在终点或起点绘制三角形箭头
+   * 渲染连线箭头（修正：箭头尖端位于终点，底边向起点方向偏移）
    */
   private renderArrow(arrow: ArrowConfig, pathInfo: { start: Point; end: Point; pathD: string }, defaultColor?: string): SVGPathElement | null {
     const direction = arrow.direction || ArrowDirection.TARGET;
@@ -304,45 +297,49 @@ export class SvgRenderer {
     const width = arrow.width || 8;
     const color = arrow.color || defaultColor || "#666666";
 
-    // 计算箭头位置：终点（target）或起点（source）
     const positions: Array<{ point: Point; angle: number }> = [];
     if (direction === ArrowDirection.TARGET || direction === ArrowDirection.BOTH) {
       const angle = this.getLineAngle(pathInfo.start, pathInfo.end);
       positions.push({ point: pathInfo.end, angle });
     }
     if (direction === ArrowDirection.SOURCE || direction === ArrowDirection.BOTH) {
-      const angle = this.getLineAngle(pathInfo.end, pathInfo.start); // 反向
+      const angle = this.getLineAngle(pathInfo.end, pathInfo.start);
       positions.push({ point: pathInfo.start, angle });
     }
 
     if (positions.length === 0) return null;
 
-    // 生成箭头路径（三角形）
     const arrowPath = createSvgElement("path") as SVGPathElement;
     let d = "";
     for (const pos of positions) {
       const { point, angle } = pos;
       const halfWidth = width / 2;
-      // 箭头指向角度（弧度）
       const theta = angle;
-      // 箭头三个顶点（相对于点）
-      const tip = { x: point.x + Math.cos(theta) * length, y: point.y + Math.sin(theta) * length };
-      const left = { x: point.x + Math.cos(theta + Math.PI / 2) * halfWidth, y: point.y + Math.sin(theta + Math.PI / 2) * halfWidth };
-      const right = { x: point.x + Math.cos(theta - Math.PI / 2) * halfWidth, y: point.y + Math.sin(theta - Math.PI / 2) * halfWidth };
-      // 绘制三角形
+
+      // 修正：尖端在连线终点，底边向起点方向延伸
+      const tip = point;
+      const base = {
+        x: point.x - Math.cos(theta) * length,
+        y: point.y - Math.sin(theta) * length,
+      };
+      const left = {
+        x: base.x + Math.cos(theta + Math.PI / 2) * halfWidth,
+        y: base.y + Math.sin(theta + Math.PI / 2) * halfWidth,
+      };
+      const right = {
+        x: base.x + Math.cos(theta - Math.PI / 2) * halfWidth,
+        y: base.y + Math.sin(theta - Math.PI / 2) * halfWidth,
+      };
       d += `M ${tip.x} ${tip.y} L ${left.x} ${left.y} L ${right.x} ${right.y} Z `;
     }
     arrowPath.setAttribute("d", d.trim());
     arrowPath.setAttribute("fill", color);
     arrowPath.setAttribute("stroke", "none");
-    arrowPath.setAttribute("pointer-events", "none"); // 箭头不拦截事件
+    arrowPath.setAttribute("pointer-events", "none");
     return arrowPath;
   }
 
   // ===================== 几何辅助方法 =====================
-  /**
-   * 计算线段的中点
-   */
   private getPathMidPoint(start: Point, end: Point): Point {
     return {
       x: (start.x + end.x) / 2,
@@ -350,9 +347,6 @@ export class SvgRenderer {
     };
   }
 
-  /**
-   * 计算从起点到终点的方向角度（弧度）
-   */
   private getLineAngle(start: Point, end: Point): number {
     return Math.atan2(end.y - start.y, end.x - start.x);
   }
@@ -361,7 +355,7 @@ export class SvgRenderer {
   setTempLine(pos: { x1: number; y1: number; x2: number; y2: number }) {
     if (!this.tempLineEl) {
       this.tempLineEl = createSvgElement("path") as SVGPathElement;
-      this.tempLineEl.setAttribute("stroke", "#000000");
+      this.tempLineEl.setAttribute("stroke", "#999999");
       this.tempLineEl.setAttribute("stroke-width", "2.5");
       this.tempLineEl.setAttribute("fill", "none");
       this.tempLineEl.setAttribute("stroke-dasharray", "8 4");
@@ -393,7 +387,6 @@ export class SvgRenderer {
 
     this.contextMenu.innerHTML = "";
 
-    // 查找节点ID（兼容多种DOM结构）
     let nodeId: string | undefined;
     let el: SVGElement | null = target;
     while (el && !nodeId) {
@@ -477,29 +470,25 @@ export class SvgRenderer {
     this.contextMenu.remove();
   }
 
-  // 在 SvgRenderer 类中增加
-
   /**
-   * 高亮或取消高亮指定锚点（修改描边样式）
+   * 高亮或取消高亮指定锚点
    */
   highlightAnchor(anchorId: string, highlight: boolean) {
-    // 在 anchorLayer 中查找对应圆点
     const circles = this.anchorLayer.querySelectorAll('circle');
     for (const circle of circles) {
       if (circle.dataset['anchorId'] === anchorId) {
         if (highlight) {
           circle.setAttribute('stroke', '#ff6622');
           circle.setAttribute('stroke-width', '4');
-          circle.setAttribute('r', String(Number(circle.getAttribute('r')) + 2));
+          const currentR = parseFloat(circle.getAttribute('r') || '6');
+          circle.setAttribute('r', String(currentR + 2));
         } else {
-          // 恢复默认样式（需要读取锚点数据）
           const ap = this.store.getAnchorPoint(anchorId);
           if (ap) {
             circle.setAttribute('stroke', ap.stroke || '#ffffff');
             circle.setAttribute('stroke-width', '2');
             circle.setAttribute('r', String(ap.radius || 6));
           } else {
-            // fallback
             circle.setAttribute('stroke', '#ffffff');
             circle.setAttribute('stroke-width', '2');
             circle.setAttribute('r', '6');

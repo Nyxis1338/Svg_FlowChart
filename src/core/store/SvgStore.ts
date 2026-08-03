@@ -1,9 +1,10 @@
 import type { Point, Rect } from "../../types/geometry";
 import type { AnchorPoint, FlowNode, FlowConnection } from "../../types/SvgModel";
 import { NodeShape } from "../../types/SvgModel";
-import { getContinuousAnchorPair, getStaticAnchor, getPerimeterAnchor, generatePath, ConnectorMode } from "../../calc";
+import { getContinuousAnchorPair, getStaticAnchor, getPerimeterAnchor, generatePath, generatePathWithOptions, ConnectorMode } from "../../calc";
 import { uuidv4 } from "../../utils/uuid";
 import type { StaticAnchorType } from "../../calc/anchor";
+import { ConnectorType } from "../../types/SvgModel";  // ✅ 新增导入
 
 type StoreChangeType = "node" | "anchorPoint" | "connection";
 type StoreChangeListener = (type: StoreChangeType) => void;
@@ -135,6 +136,10 @@ export class SvgStore {
 
   // ===================== Connection 连线 =====================
   addConnection(conn: FlowConnection) {
+    // 如果外部传入的 conn 未指定 connectorType，可设默认值
+    if (!conn.connectorType) {
+      conn.connectorType = ConnectorType.FLOWCHART; // 使用枚举
+    }
     this.connections.set(conn.id, structuredClone(conn));
     this.notify("connection");
   }
@@ -179,9 +184,12 @@ export class SvgStore {
       const targetNode = this.getNode(targetAp.nodeId);
       if (!sourceNode || !targetNode) return null;
 
-      const start = this.calcAnchorPos(sourceNode, sourceAp);
-      const end = this.calcAnchorPos(targetNode, targetAp);
-      const pathD = generatePath(conn.connectorType, start, end);
+      // const start = this.calcAnchorPos(sourceNode, sourceAp);
+      // const end = this.calcAnchorPos(targetNode, targetAp);
+      const start = this.calcAnchorPosForNode(sourceNode, sourceAp);
+      const end = this.calcAnchorPosForNode(targetNode, targetAp);
+      // const pathD = generatePath(conn.connectorType, start, end);
+      const pathD = generatePathWithOptions(conn.connectorType, start, end, { stub: 45 });
       return { start, end, pathD };
     }
 
@@ -271,5 +279,62 @@ export class SvgStore {
 
     this.notify("node");
     return node;
+  }
+
+  // 在类中添加方法：
+/**
+ * 根据节点形状计算锚点坐标（支持圆形、椭圆等）
+ */
+  calcAnchorPosForNode(node: FlowNode, ap: AnchorPoint): Point {
+    const rect = { x: node.x, y: node.y, width: node.width, height: node.height };
+
+    if (ap.anchorMode === "static") {
+      const type = ap.staticType!;
+      // 对圆形和椭圆特殊处理
+      if (node.shape === NodeShape.CIRCLE) {
+        const cx = rect.x + rect.width / 2;
+        const cy = rect.y + rect.height / 2;
+        const r = Math.min(rect.width, rect.height) / 2;
+        let angle = 0;
+        switch (type) {
+          case "Top": angle = -Math.PI / 2; break;
+          case "Right": angle = 0; break;
+          case "Bottom": angle = Math.PI / 2; break;
+          case "Left": angle = Math.PI; break;
+          default: angle = 0;
+        }
+        return { x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle) };
+      }
+      if (node.shape === NodeShape.ELLIPSE) {
+        const cx = rect.x + rect.width / 2;
+        const cy = rect.y + rect.height / 2;
+        const rx = rect.width / 2;
+        const ry = rect.height / 2;
+        let angle = 0;
+        switch (type) {
+          case "Top": angle = -Math.PI / 2; break;
+          case "Right": angle = 0; break;
+          case "Bottom": angle = Math.PI / 2; break;
+          case "Left": angle = Math.PI; break;
+          default: angle = 0;
+        }
+        return { x: cx + rx * Math.cos(angle), y: cy + ry * Math.sin(angle) };
+      }
+      // 矩形和菱形沿用矩形边缘计算
+      return getStaticAnchor(rect, type, ap.offset);
+    }
+
+    if (ap.anchorMode === "perimeter") {
+      if (ap.perimeterTotal !== undefined && ap.perimeterIndex !== undefined) {
+        let pt = getPerimeterAnchor(rect, ap.perimeterTotal, ap.perimeterIndex);
+        if (ap.offset) {
+          pt = { x: pt.x + ap.offset.x, y: pt.y + ap.offset.y };
+        }
+        return pt;
+      }
+      return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+    }
+
+    return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
   }
 }

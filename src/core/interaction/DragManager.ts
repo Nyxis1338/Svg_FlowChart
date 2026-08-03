@@ -5,6 +5,7 @@ import type { SvgRenderer } from "../renderer/SvgRenderer";
 import type { SelectionManager } from "../selection/SelectionManager";
 import type { AnchorPoint, FlowNode, FlowConnection } from "../../types/SvgModel";
 import type { Point } from "../../types/geometry";
+import { ConnectorType } from "../../types/SvgModel";
 
 /** 拖拽类型 */
 type DragType = 'node' | 'link' | 'reconnect';
@@ -91,7 +92,7 @@ export class DragManager {
         y: canvasPos.y - node.y,
       },
     };
-    this.selection.select("node", nodeId);
+    // 不在此处选中，拖拽结束时再选中
   }
 
   /**
@@ -104,56 +105,40 @@ export class DragManager {
     // 空格平移时禁止拖拽
     if (this.viewport.isSpaceActive()) return;
 
-    // 只允许从 output 方向锚点拖拽（可根据需要调整）
-    if (anchor.direction !== "output") return;
-
-    const canvasPos = this.viewport.screenToCanvas({ x: evt.clientX, y: evt.clientY });
-
-    // 判断是新建还是重连
+    const node = this.store.getNode(anchor.nodeId);
+    if (!node) return;
+    const anchorPos = this.store.calcAnchorPosForNode(node, anchor);
     const isReconnect = !!existingConnection;
 
-    // 如果是重连，确保该连线确实包含此锚点（作为源或目标）
+    // 如果是重连模式，进行必要校验
     if (isReconnect) {
       const conn = existingConnection!;
-      // 检查锚点是否属于该连线（作为源或目标）
       const isSource = conn.sourceAnchorId === anchor.id;
       const isTarget = conn.targetAnchorId === anchor.id;
       if (!isSource && !isTarget) {
         console.warn("尝试重连的锚点不属于该连线");
         return;
       }
-      // 如果是重连，我们约定从目标端拖拽重连（也可以支持源端，但为了简化，我们只支持目标端重连）
-      // 这里我们允许从目标端拖拽，解绑目标端，重新连接到新锚点
-      // 为了更通用，我们可以允许从任意一端拖拽，但需记录哪一端被解绑
-      // 此处实现：只支持从目标端重连（更常用），如需支持源端可扩展
+      // 目前只支持从目标端重连（更常用）
       if (!isTarget) {
         console.warn("目前只支持从目标端重连");
         return;
       }
-      // 记录原目标锚点ID，便于取消时恢复
-      this.linkDrag = {
-        active: true,
-        type: 'reconnect',
-        sourceAnchorId: anchor.id,           // 起始锚点（源锚点）
-        startX: canvasPos.x,
-        startY: canvasPos.y,
-        connectionId: conn.id,
-        oldTargetAnchorId: conn.targetAnchorId,
-      };
-    } else {
-      // 新建连线
-      this.linkDrag = {
-        active: true,
-        type: 'create',
-        sourceAnchorId: anchor.id,
-        startX: canvasPos.x,
-        startY: canvasPos.y,
-      };
     }
+
+    // 初始化拖拽状态
+    this.linkDrag = {
+      active: true,
+      type: isReconnect ? 'reconnect' : 'create',
+      sourceAnchorId: anchor.id,
+      startX: anchorPos.x,
+      startY: anchorPos.y,
+      connectionId: existingConnection?.id,
+      oldTargetAnchorId: existingConnection?.targetAnchorId,
+    };
 
     evt.preventDefault();
     this.chart.getSvgRoot().style.cursor = "grabbing";
-    // 清除之前的高亮
     this.clearHighlight();
   }
 
@@ -166,7 +151,6 @@ export class DragManager {
       const newX = canvasPos.x - this.nodeDrag.offset.x;
       const newY = canvasPos.y - this.nodeDrag.offset.y;
       this.store.updateNode(nodeId, { x: newX, y: newY });
-      // 节点拖拽时，连线会自动跟随（因为 store 触发重绘）
     }
 
     // 连线拖拽逻辑（新建或重连）
@@ -181,7 +165,6 @@ export class DragManager {
 
       // 检测鼠标下是否有可用的目标锚点（排除自身节点）
       const hitAnchor = this.queryAnchorUnderMouse(evt);
-      // 如果命中锚点且不属于起始锚点所在的节点（防止自连）
       const sourceAnchor = this.store.getAnchorPoint(this.linkDrag.sourceAnchorId);
       const sourceNode = sourceAnchor ? this.store.getNode(sourceAnchor.nodeId) : null;
       const isValidTarget = hitAnchor && sourceNode && this.store.getNode(hitAnchor.nodeId)?.id !== sourceNode.id;
@@ -190,10 +173,6 @@ export class DragManager {
       if (isValidTarget && hitAnchor !== this.highlightedAnchor) {
         this.clearHighlight();
         this.highlightedAnchor = hitAnchor;
-        // 通过 SelectionManager 或直接修改样式？由于 SelectionManager 只支持选中节点/连线，我们采用直接修改DOM的方式
-        // 在渲染器中查找对应的锚点元素并添加高亮类（需要 SvgRenderer 支持）
-        // 或者我们通过 SelectionManager 临时标记（但 SelectionManager 只支持 node/connection）
-        // 我们可以在 SvgRenderer 中添加一个方法 setAnchorHighlight(anchorId, highlight)
         this.renderer.highlightAnchor(hitAnchor.id, true);
       } else if (!isValidTarget && this.highlightedAnchor) {
         this.clearHighlight();
@@ -205,10 +184,14 @@ export class DragManager {
     // 恢复光标
     this.chart.getSvgRoot().style.cursor = "";
 
-    // 清空节点拖拽
-    this.nodeDrag = null;
+    // ---- 处理节点拖拽结束 ----
+    if (this.nodeDrag) {
+      const nodeId = this.nodeDrag.nodeId;   // 先保存
+      this.selection.select("node", nodeId); // 选中节点
+      this.nodeDrag = null;                  // 最后清空
+    }
 
-    // 处理连线拖拽结束
+    // ---- 处理连线拖拽结束 ----
     if (this.linkDrag?.active) {
       const hitAnchor = this.queryAnchorUnderMouse(evt);
       const sourceAnchor = this.store.getAnchorPoint(this.linkDrag.sourceAnchorId);
@@ -226,16 +209,14 @@ export class DragManager {
             if (connId) {
               const conn = this.store.getConnection(connId);
               if (conn) {
-                // 检查是否与旧目标相同，如果相同则不操作
                 if (conn.targetAnchorId !== hitAnchor.id) {
-                  // 查重：检查是否已经存在相同的连线（源-目标对）
+                  // 查重
                   const exist = this.store.getAllConnections().some(c =>
                     c.id !== connId &&
                     c.sourceAnchorId === sourceAnchor.id &&
                     c.targetAnchorId === hitAnchor.id
                   );
                   if (!exist) {
-                    // 更新目标锚点
                     this.store.updateConnection(connId, { targetAnchorId: hitAnchor.id });
                     success = true;
                   } else {
@@ -255,7 +236,7 @@ export class DragManager {
             if (!exist) {
               this.store.addConnection({
                 id: crypto.randomUUID(),
-                connectorType: "flowchart",
+                connectorType: ConnectorType.FLOWCHART,
                 sourceAnchorId: sourceAnchor.id,
                 targetAnchorId: hitAnchor.id,
                 stroke: "#444444",
@@ -269,21 +250,17 @@ export class DragManager {
         }
       }
 
-      // 如果操作失败（未命中有效锚点或取消），且是重连模式，恢复原目标锚点
+      // 如果操作失败，且是重连模式，恢复原目标锚点
       if (!success && isReconnect) {
         const connId = this.linkDrag.connectionId;
         const oldTargetId = this.linkDrag.oldTargetAnchorId;
         if (connId && oldTargetId) {
-          // 恢复原目标
           this.store.updateConnection(connId, { targetAnchorId: oldTargetId });
-          // 注意：如果连线未被删除，恢复原状态
         }
       }
 
-      // 清除高亮
+      // 清除高亮和临时虚线
       this.clearHighlight();
-
-      // 清除临时虚线
       this.renderer.clearTempLine();
 
       // 清空拖拽状态
@@ -368,7 +345,7 @@ export class DragManager {
     for (const ap of allAnchors) {
       const node = this.store.getNode(ap.nodeId);
       if (!node) continue;
-      const pos = this.store.calcAnchorPos(node, ap);
+      const pos = this.store.calcAnchorPosForNode(node, ap);
       const distance = Math.hypot(canvasPoint.x - pos.x, canvasPoint.y - pos.y);
       if (distance < minDist) {
         minDist = distance;

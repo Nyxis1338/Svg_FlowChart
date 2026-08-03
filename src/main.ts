@@ -244,3 +244,51 @@ document.getElementById("clearAllBtn")?.addEventListener("click", () => {
     }
   }
 });
+
+// ===== 连续锚点示例 =====
+// 创建两个新节点
+const nodeCont1 = store.addNodeWithAnchors({
+  x: 700,
+  y: 500,
+  width: 130,
+  height: 80,
+  label: "连续源",
+  shape: NodeShape.RECTANGLE,
+  fill: "#f3e5f5",
+  stroke: "#7b1fa2",
+});
+
+const nodeCont2 = store.addNodeWithAnchors({
+  x: 900,
+  y: 520,
+  width: 130,
+  height: 80,
+  label: "连续目标",
+  shape: NodeShape.RECTANGLE,
+  fill: "#e8f5e9",
+  stroke: "#388e3c",
+});
+
+// 使用节点直连模式（不指定锚点ID）
+store.addConnection({
+  id: crypto.randomUUID(),
+  connectorType: ConnectorType.FLOWCHART,   // 或其他类型
+  sourceNodeId: nodeCont1.id,
+  targetNodeId: nodeCont2.id,
+  stroke: "#d32f2f",
+  strokeWidth: 2,
+  label: {
+    text: "连续锚点",
+    fontSize: 12,
+    color: "#d32f2f",
+    offset: { x: 0, y: -12 },
+  },
+  arrow: {
+    direction: ArrowDirection.TARGET,
+    length: 10,
+    width: 8,
+    color: "#d32f2f",
+  },
+});
+
+console.log("✅ 连续锚点示例已添加（不可见锚点，自动计算端点）");

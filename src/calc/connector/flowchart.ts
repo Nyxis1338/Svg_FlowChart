@@ -9,45 +9,69 @@ import type { Point } from "../../types/geometry";
  * @param stub 折线拐点距离端点延伸的固定长度（默认 35），可调整
  * @returns SVG 路径字符串
  */
-export function connectorFlowchart(
-  start: Point,
-  end: Point,
-  stub: number = 35
-): string {
-  const dx = Math.abs(start.x - end.x);
-  const dy = Math.abs(start.y - end.y);
+export function connectorFlowchart(start: Point, end: Point, stub: number = 35): string {
+  // 计算起点和终点方向（基于相对位置）
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const absDx = Math.abs(dx);
+  const absDy = Math.abs(dy);
 
-  // 如果水平或垂直距离很小，直接画直线
-  if (dx < 0.1 && dy < 0.1) {
-    return `M ${start.x} ${start.y} L ${end.x} ${end.y}`;
-  }
+  // 决定主方向
+  let startDir: 'h' | 'v' = absDx > absDy ? 'h' : 'v';
+  let endDir: 'h' | 'v' = absDx > absDy ? 'h' : 'v';
 
-  const path: Point[] = [{ ...start }];
+  // 如果水平距离很小，起点先垂直延伸
+  if (absDx < stub) startDir = 'v';
+  if (absDy < stub) endDir = 'h';
 
-  // 根据起点终点的相对位置，决定折线路径
-  if (dx < stub) {
-    // 水平距离很小，垂直方向取中点折线
-    const midY = (start.y + end.y) / 2;
-    path.push({ x: start.x, y: midY });
-    path.push({ x: end.x, y: midY });
-  } else if (dy < stub) {
-    // 垂直距离很小，水平方向取中点折线
-    const midX = (start.x + end.x) / 2;
-    path.push({ x: midX, y: start.y });
-    path.push({ x: midX, y: end.y });
+  // 构造路径点
+  const points: Point[] = [{ ...start }];
+  // 起点延伸
+  if (startDir === 'h') {
+    const x = start.x + Math.sign(dx) * stub;
+    points.push({ x, y: start.y });
   } else {
-    // 一般情况：先水平走到中点，再垂直走到终点
-    const midX = (start.x + end.x) / 2;
-    path.push({ x: midX, y: start.y });
-    path.push({ x: midX, y: end.y });
+    const y = start.y + Math.sign(dy) * stub;
+    points.push({ x: start.x, y });
   }
 
-  path.push({ ...end });
+  // 中间拐点（如果水平和垂直方向都需要拐弯）
+  const last = points[points.length - 1];
+  if (startDir !== endDir) {
+    // 需要一个中间拐点
+    const midX = (start.x + end.x) / 2;
+    const midY = (start.y + end.y) / 2;
+    if (startDir === 'h') {
+      points.push({ x: midX, y: last.y });
+      points.push({ x: midX, y: end.y });
+    } else {
+      points.push({ x: last.x, y: midY });
+      points.push({ x: end.x, y: midY });
+    }
+  } else {
+    // 同向，可以直接连接
+    if (startDir === 'h') {
+      points.push({ x: end.x, y: last.y });
+    } else {
+      points.push({ x: last.x, y: end.y });
+    }
+  }
 
-  // 构建路径字符串
-  let d = `M ${path[0].x} ${path[0].y}`;
-  for (let i = 1; i < path.length; i++) {
-    d += ` L ${path[i].x} ${path[i].y}`;
+  // 终点延伸反向
+  const penultimate = points[points.length - 1];
+  if (endDir === 'h') {
+    const x = end.x - Math.sign(end.x - penultimate.x) * stub;
+    points.push({ x, y: end.y });
+  } else {
+    const y = end.y - Math.sign(end.y - penultimate.y) * stub;
+    points.push({ x: end.x, y });
+  }
+  points.push({ ...end });
+
+  // 构建路径
+  let d = `M ${points[0].x} ${points[0].y}`;
+  for (let i = 1; i < points.length; i++) {
+    d += ` L ${points[i].x} ${points[i].y}`;
   }
   return d;
 }
