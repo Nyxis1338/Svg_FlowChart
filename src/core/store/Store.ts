@@ -160,6 +160,9 @@ export class Store {
       const ry = rect.height / 2;
       const angle = this.getAngleForPosition(position);
       pt = { x: cx + rx * Math.cos(angle), y: cy + ry * Math.sin(angle) };
+    } else if (shape === NodeShape.DIAMOND) {
+          // 菱形特殊处理：映射到四个顶点和四条边的中点
+    pt = this.getDiamondAnchorPosition(rect, position);
     } else {
       // 矩形/菱形：使用矩形边缘计算
       pt = this.getStaticAnchorPosition(rect, position);
@@ -191,6 +194,60 @@ export class Store {
     }
     return pt;
   }
+
+  /**
+ * 计算菱形锚点位置
+ * 菱形顶点：上(cx, cy-hh), 右(cx+hw, cy), 下(cx, cy+hh), 左(cx-hw, cy)
+ * 映射规则：
+ *   TOP_LEFT     → 左上边（左-上）的中点
+ *   TOP          → 上顶点
+ *   TOP_RIGHT    → 右上边（上-右）的中点
+ *   RIGHT        → 右顶点
+ *   BOTTOM_RIGHT → 右下边（右-下）的中点
+ *   BOTTOM       → 下顶点
+ *   BOTTOM_LEFT  → 左下边（下-左）的中点
+ *   LEFT         → 左顶点
+ */
+  private getDiamondAnchorPosition(rect: Rect, position: AnchorPosition): Point {
+    const cx = rect.x + rect.width / 2;
+    const cy = rect.y + rect.height / 2;
+    const hw = rect.width / 2;
+    const hh = rect.height / 2;
+
+    // 四个顶点
+    const top = { x: cx, y: cy - hh };
+    const right = { x: cx + hw, y: cy };
+    const bottom = { x: cx, y: cy + hh };
+    const left = { x: cx - hw, y: cy };
+
+    // 中点函数
+    const mid = (p1: Point, p2: Point): Point => ({
+      x: (p1.x + p2.x) / 2,
+      y: (p1.y + p2.y) / 2,
+    });
+
+    switch (position) {
+      case AnchorPosition.TOP_LEFT:
+        return mid(left, top);     // 左上边中点
+      case AnchorPosition.TOP:
+        return top;                // 上顶点
+      case AnchorPosition.TOP_RIGHT:
+        return mid(top, right);    // 右上边中点
+      case AnchorPosition.RIGHT:
+        return right;              // 右顶点
+      case AnchorPosition.BOTTOM_RIGHT:
+        return mid(right, bottom); // 右下边中点
+      case AnchorPosition.BOTTOM:
+        return bottom;             // 下顶点
+      case AnchorPosition.BOTTOM_LEFT:
+        return mid(bottom, left);  // 左下边中点
+      case AnchorPosition.LEFT:
+        return left;               // 左顶点
+      default:
+        return { x: cx, y: cy };
+    }
+  }
+
 
   private getAngleForPosition(position: AnchorPosition): number {
     switch (position) {
