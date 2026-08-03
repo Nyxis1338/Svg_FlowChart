@@ -1,4 +1,4 @@
-type SelectableType = "node" | "anchorPoint" | "connection" | null;
+type SelectableType = "node" | "anchor" | "connection" | null;  // 改为 "anchor"
 
 export class SelectionManager {
   private selectedType: SelectableType = null;
@@ -6,7 +6,6 @@ export class SelectionManager {
 
   private listeners: Set<() => void> = new Set();
 
-  // 订阅选中变更
   subscribe(fn: () => void) {
     this.listeners.add(fn);
     return () => this.listeners.delete(fn);

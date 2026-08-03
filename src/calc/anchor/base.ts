@@ -1,5 +1,5 @@
 import type { Point } from "../../types/geometry";
-import type { FlowNode } from "../../types/SvgModel";
+import type { Node } from "../../types/SvgModel";
 
 /**
  * 锚点计算器抽象基类
@@ -12,5 +12,5 @@ export abstract class BaseAnchorCalculator {
    * @param anchorId 锚点唯一标识
    * @returns 锚点的画布坐标
    */
-  abstract calculate(node: FlowNode, anchorId: string): Point;
+  abstract calculate(node: Node, anchorId: string): Point;
 }

@@ -1,11 +1,9 @@
 // src/types/SvgModel.ts
 
 import type { Point, Rect } from "./geometry";
-// 假设原有的 calc 类型仍然使用，我们保留兼容
 import type { StaticAnchorType } from "../calc/anchor";
-import type { ConnectorMode } from "../calc/connector";
 
-// ==================== 新增枚举定义 ====================
+// ==================== 枚举定义 ====================
 
 /** 节点形状 */
 export enum NodeShape {
@@ -15,21 +13,23 @@ export enum NodeShape {
     ELLIPSE = 'ellipse',
 }
 
-/** 锚点类型 (替代原有的 anchorMode 概念) */
+/** 锚点类型 */
 export enum AnchorType {
-    /** 固定锚点：在节点特定位置显示为可见点 */
-    FIXED = 'fixed',
-    /** 周长锚点：沿节点边缘动态计算，对应原有的 'perimeter' */
-    PERIMETER = 'perimeter',
-    /** 静态锚点：固定偏移量，对应原有的 'static' */
+    /** 静态锚点：在节点特定位置（上/右/下/左等）固定，可见 */
     STATIC = 'static',
+    /** 周长锚点：沿节点边缘均匀分布，不可见但可交互 */
+    PERIMETER = 'perimeter',
 }
 
-/** 固定锚点的位置 */
+/** 静态锚点的位置（8个方向） */
 export enum AnchorPosition {
+    TOP_LEFT = 'top-left',
     TOP = 'top',
+    TOP_RIGHT = 'top-right',
     RIGHT = 'right',
+    BOTTOM_RIGHT = 'bottom-right',
     BOTTOM = 'bottom',
+    BOTTOM_LEFT = 'bottom-left',
     LEFT = 'left',
 }
 
@@ -48,82 +48,15 @@ export enum ConnectorType {
     FLOWCHART = 'flowchart',
 }
 
-// ==================== 增强的 AnchorPoint ====================
+// ==================== 标签和箭头配置 ====================
 
-/**
- * 锚点（端点）定义
- * 兼容原有的 anchorMode，同时引入新的 type/position 体系
- */
-export interface AnchorPoint {
-    id: string;
-    nodeId: string;
-
-    // ---- 原有字段（保持兼容） ----
-    /** @deprecated 建议使用 type 代替 */
-    anchorMode?: "static" | "perimeter";
-    staticType?: StaticAnchorType;
-    perimeterTotal?: number;
-    perimeterIndex?: number;
-    offset?: Point;
-    direction: "input" | "output";
-
-    // ---- 新增字段 ----
-    /** 锚点类型，明确区分固定、周长、静态 */
-    type?: AnchorType;
-    /** 当 type = FIXED 时，指定其在节点上的位置 */
-    position?: AnchorPosition;
-    /** 是否在画布上可见（固定锚点通常可见，周长锚点通常不可见） */
-    visible?: boolean;
-
-    // ---- 渲染样式（原有） ----
-    radius?: number;
-    fill?: string;
-    stroke?: string;
-
-    data?: Record<string, unknown>;
-}
-
-// ==================== 增强的 FlowNode ====================
-
-/**
- * 节点定义
- * 增加形状、样式、选中状态，并引入锚点聚合（可选）
- */
-export interface FlowNode {
-    id: string;
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-    label?: string;
-
-    // ---- 新增字段 ----
-    shape?: NodeShape;                 // 节点形状，默认 rectangle
-    fill?: string;                     // 背景色
-    stroke?: string;                   // 边框色
-    strokeWidth?: number;              // 边框宽度
-    selected?: boolean;                // 选中状态
-    /** 该节点包含的锚点ID列表（便于快速获取，但数据以独立 AnchorPoint 为准） */
-    anchorIds?: string[];
-
-    data?: Record<string, unknown>;
-}
-
-// ==================== 增强的 FlowConnection ====================
-
-/**
- * 连线标签配置
- */
 export interface LabelConfig {
     text: string;
     fontSize?: number;
     color?: string;
-    offset?: Point;      // 相对连线中点的偏移
+    offset?: Point;
 }
 
-/**
- * 连线箭头配置
- */
 export interface ArrowConfig {
     direction?: ArrowDirection;
     length?: number;
@@ -131,62 +64,74 @@ export interface ArrowConfig {
     color?: string;
 }
 
-/**
- * 连线定义
- * 保留两种连接模式，同时增加标签和箭头
- */
-export interface FlowConnection {
+// ==================== 实体接口 ====================
+
+export interface Node {
     id: string;
-    connectorType: ConnectorType;  // 原来是 ConnectorMode，现在改为枚举
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    label?: string;
+    shape?: NodeShape;
+    fill?: string;
     stroke?: string;
     strokeWidth?: number;
+    selected?: boolean;
+    anchorIds?: string[];
+    data?: Record<string, unknown>;
+}
 
-    // 模式A：锚点相连（实体端点）
+export interface Anchor {
+    id: string;
+    nodeId: string;
+    type: AnchorType;
+    position?: AnchorPosition;          // 仅 STATIC 有效
+    direction: 'input' | 'output';
+    radius?: number;
+    fill?: string;
+    stroke?: string;
+    offset?: Point;                     // 额外偏移
+    perimeterTotal?: number;            // 仅 PERIMETER 有效
+    perimeterIndex?: number;            // 仅 PERIMETER 有效
+    visible?: boolean;
+    data?: Record<string, unknown>;
+}
+
+export interface Connection {
+    id: string;
+    connectorType: ConnectorType;
     sourceAnchorId?: string;
     targetAnchorId?: string;
-
-    // 模式B：节点直连（Continuous 自动锚点）
     sourceNodeId?: string;
     targetNodeId?: string;
-
-    // ---- 新增字段 ----
+    stroke?: string;
+    strokeWidth?: number;
     label?: LabelConfig;
     arrow?: ArrowConfig;
     selected?: boolean;
 }
 
-// ==================== 容器配置（新增） ====================
+// ==================== 容器与视图状态 ====================
 
-/**
- * 容器（画布）配置
- */
 export interface ContainerConfig {
-    id: string;                         // 格式：'content-{uuid}'
+    id: string;
     background?: string;
     minZoom?: number;
     maxZoom?: number;
     initialZoom?: number;
 }
 
-/**
- * 视图状态（用于 ViewportManager）
- */
 export interface ViewState {
     translateX: number;
     translateY: number;
     scale: number;
 }
 
-// ==================== 顶层数据模型（用于 SvgStore） ====================
-
-/**
- * SvgStore 管理的完整数据模型
- * 您可以根据需要选择是否采用此结构
- */
 export interface SvgDataModel {
-    nodes: Record<string, FlowNode>;
-    connections: Record<string, FlowConnection>;
-    anchors: Record<string, AnchorPoint>;  // 新增锚点独立存储
+    nodes: Record<string, Node>;
+    connections: Record<string, Connection>;
+    anchors: Record<string, Anchor>;
     viewState: ViewState;
     containerConfig: ContainerConfig;
 }

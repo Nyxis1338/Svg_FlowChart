@@ -19,6 +19,7 @@ export * from "./anchor";
 // 包含: generatePath, generatePathWithOptions, ConnectorMode 等
 export * from "./connector";
 
-// 显式导出类型，方便外部引用（TypeScript 3.8+ 支持）
+
+// 显式导出类型
 export type { StaticAnchorType } from "./anchor";
 export type { ConnectorMode } from "./connector";

@@ -1,9 +1,9 @@
-import { SvgFlowChart } from "./core/SvgFlowChart";
+import { SvgEngine } from "./core/SvgEngine";
 import { NodeShape, ArrowDirection, ConnectorType } from "./types/SvgModel";
 
 // ==================== 初始化画布 ====================
 const appDom = document.getElementById("canvas-container")!;
-const chart = new SvgFlowChart(appDom);
+const chart = new SvgEngine(appDom);
 (window as any).chart = chart; // 挂载到全局，方便控制台调试
 const store = chart.store;
 
@@ -57,7 +57,7 @@ const nodeD = store.addNodeWithAnchors({
 });
 
 // ==================== 创建连线（测试多种类型 + 标签/箭头） ====================
-const allAnchors = store.getAllAnchorPoints();
+const allAnchors = store.getAllAnchors();
 
 // 辅助：根据节点ID和方向获取锚点
 function getAnchor(nodeId: string, staticType: "Top" | "Right" | "Bottom" | "Left") {

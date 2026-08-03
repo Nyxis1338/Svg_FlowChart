@@ -1,25 +1,25 @@
-// src/core/SvgFlowChart.ts
-import { SvgStore } from "./store/SvgStore";
+// src/core/SvgEngine.ts
+
+import { Store } from "./store/Store";
 import { ViewportManager } from "./viewport/ViewportManager";
 import { SelectionManager } from "./selection/SelectionManager";
 import { DragManager } from "./interaction/DragManager";
 import { SvgRenderer } from "./renderer/SvgRenderer";
 import type {
-  FlowNode,
-  FlowConnection,
-  AnchorPoint,
+  Node,
+  Connection,
+  Anchor,
   NodeShape,
 } from "../types/SvgModel";
 import type { Point } from "../types/geometry";
-import { uuidv4 } from "../utils/uuid"; // 假设有这个工具
+import { uuidv4 } from "../utils/uuid";
 
 /**
- * SvgFlowChart 主类
- * 提供完整的流程图引擎功能
+ * SvgEngine 主类：聚合所有子模块，对外提供统一 API
  */
-export class SvgFlowChart {
+export class SvgEngine {
   public readonly svgRoot: SVGSVGElement;
-  public readonly store: SvgStore;
+  public readonly store: Store;
   public readonly viewport: ViewportManager;
   public readonly selection: SelectionManager;
   public readonly dragManager: DragManager;
@@ -29,7 +29,7 @@ export class SvgFlowChart {
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg") as SVGSVGElement;
     container.appendChild(svg);
     this.svgRoot = svg;
-    this.store = new SvgStore();
+    this.store = new Store();
     this.viewport = new ViewportManager(this.svgRoot);
     this.selection = new SelectionManager();
 
@@ -42,19 +42,19 @@ export class SvgFlowChart {
   }
 
   // ==================== 节点操作 ====================
-  addNode(data: Omit<FlowNode, "id">): FlowNode {
+  addNode(data: Omit<Node, "id">): Node {
     return this.store.addNodeWithAnchors(data);
   }
 
-  getNode(id: string): FlowNode | undefined {
+  getNode(id: string): Node | undefined {
     return this.store.getNode(id);
   }
 
-  getAllNodes(): FlowNode[] {
+  getAllNodes(): Node[] {
     return this.store.getAllNodes();
   }
 
-  updateNode(id: string, updates: Partial<FlowNode>): void {
+  updateNode(id: string, updates: Partial<Node>): void {
     this.store.updateNode(id, updates);
   }
 
@@ -63,22 +63,22 @@ export class SvgFlowChart {
   }
 
   // ==================== 连线操作 ====================
-  addConnection(data: Omit<FlowConnection, "id">): FlowConnection {
+  addConnection(data: Omit<Connection, "id">): Connection {
     const id = `connect-${uuidv4()}`;
-    const conn: FlowConnection = { id, ...data };
+    const conn: Connection = { id, ...data };
     this.store.addConnection(conn);
     return conn;
   }
 
-  getConnection(id: string): FlowConnection | undefined {
+  getConnection(id: string): Connection | undefined {
     return this.store.getConnection(id);
   }
 
-  getAllConnections(): FlowConnection[] {
+  getAllConnections(): Connection[] {
     return this.store.getAllConnections();
   }
 
-  updateConnection(id: string, updates: Partial<FlowConnection>): void {
+  updateConnection(id: string, updates: Partial<Connection>): void {
     this.store.updateConnection(id, updates);
   }
 
@@ -87,23 +87,23 @@ export class SvgFlowChart {
   }
 
   // ==================== 锚点操作 ====================
-  addAnchor(data: Omit<AnchorPoint, "id">): AnchorPoint {
+  addAnchor(data: Omit<Anchor, "id">): Anchor {
     const id = `anchor-${uuidv4()}`;
-    const anchor: AnchorPoint = { id, ...data };
-    this.store.addAnchorPoint(anchor);
+    const anchor: Anchor = { id, ...data };
+    this.store.addAnchor(anchor);
     return anchor;
   }
 
-  getAllAnchors(): AnchorPoint[] {
-    return this.store.getAllAnchorPoints();
+  getAllAnchors(): Anchor[] {
+    return this.store.getAllAnchors();
   }
 
-  getNodeAnchors(nodeId: string): AnchorPoint[] {
-    return this.store.getNodeAnchorPoints(nodeId);
+  getNodeAnchors(nodeId: string): Anchor[] {
+    return this.store.getNodeAnchors(nodeId);
   }
 
   removeAnchor(id: string): void {
-    this.store.removeAnchorPoint(id);
+    this.store.removeAnchor(id);
   }
 
   // ==================== 视图操作 ====================
@@ -166,11 +166,11 @@ export class SvgFlowChart {
   }
 
   // ==================== 数据导入/导出 ====================
-  exportData(): { nodes: FlowNode[]; anchorPoints: AnchorPoint[]; connections: FlowConnection[] } {
+  exportData(): { nodes: Node[]; anchors: Anchor[]; connections: Connection[] } {
     return this.store.exportData();
   }
 
-  importData(data: { nodes: FlowNode[]; anchorPoints: AnchorPoint[]; connections: FlowConnection[] }): void {
+  importData(data: { nodes: Node[]; anchors: Anchor[]; connections: Connection[] }): void {
     this.store.importData(data);
   }
 

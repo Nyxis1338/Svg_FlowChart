@@ -154,16 +154,17 @@ export class ViewportManager {
 
   // ========== 坐标转换 ==========
   screenToCanvas(point: Point): Point {
+    // 使用双精度计算，避免浮点误差
     return {
       x: (point.x - this.translate.x) / this.scale,
-      y: (point.y - this.translate.y) / this.scale
+      y: (point.y - this.translate.y) / this.scale,
     };
   }
 
   canvasToScreen(point: Point): Point {
     return {
       x: point.x * this.scale + this.translate.x,
-      y: point.y * this.scale + this.translate.y
+      y: point.y * this.scale + this.translate.y,
     };
   }
 

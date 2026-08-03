@@ -1,20 +1,14 @@
 import type { Point, Rect } from "../../types/geometry";
-import type { FlowNode } from "../../types/SvgModel";
 import { computeStaticAnchor, StaticAnchorType } from "./static";
 import { computeContinuousAnchor } from "./continuous";
 import { computePerimeterAnchor, getAllPerimeterAnchors } from "./perimeter";
 
 export * from "./static";
-
 export type AnchorType = StaticAnchorType | "Continuous" | "Perimeter";
 
 /**
- * 类型守卫：判断是否为 FlowNode
+ * 静态锚点：计算节点上固定位置（上/右/下/左/中心）的坐标
  */
-function isFlowNode(obj: Rect | FlowNode): obj is FlowNode {
-  return 'id' in obj && 'label' in obj;
-}
-
 export function getStaticAnchor(rect: Rect, type: StaticAnchorType, offset?: Point): Point {
   const pt = computeStaticAnchor(rect, type);
   if (offset) {
@@ -23,20 +17,20 @@ export function getStaticAnchor(rect: Rect, type: StaticAnchorType, offset?: Poi
   return pt;
 }
 
-export function getContinuousAnchorPair(
-  source: Rect | FlowNode,
-  target: Rect | FlowNode
-): { source: Point; target: Point } {
-  const sourceRect: Rect = isFlowNode(source)
-    ? { x: source.x, y: source.y, width: source.width, height: source.height }
-    : source;
-  const targetRect: Rect = isFlowNode(target)
-    ? { x: target.x, y: target.y, width: target.width, height: target.height }
-    : target;
-
+/**
+ * 连续锚点：根据两个矩形的相对位置计算最佳连接点
+ * 仅接受 Rect 类型（调用方负责从 Node 提取 Rect）
+ */
+export function getContinuousAnchorPair(sourceRect: Rect, targetRect: Rect): {
+  source: Point;
+  target: Point;
+} {
   return computeContinuousAnchor(sourceRect, targetRect);
 }
 
+/**
+ * 周边均分锚点
+ */
 export function getPerimeterAnchor(rect: Rect, total: number, idx: number): Point {
   return computePerimeterAnchor(rect, total, idx);
 }

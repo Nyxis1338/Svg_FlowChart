@@ -1,43 +1,42 @@
-import type { SvgFlowChart } from "../SvgFlowChart";
-import type { SvgStore } from "../store/SvgStore";
+import type { SvgEngine } from "../SvgEngine";
+import type { Store } from "../store/Store";
 import type { ViewportManager } from "../viewport/ViewportManager";
 import type { SvgRenderer } from "../renderer/SvgRenderer";
 import type { SelectionManager } from "../selection/SelectionManager";
-import type { AnchorPoint, FlowNode, FlowConnection } from "../../types/SvgModel";
+import type { Anchor, Node, Connection } from "../../types/SvgModel";
 import type { Point } from "../../types/geometry";
 import { ConnectorType } from "../../types/SvgModel";
 
-/** 拖拽类型 */
-type DragType = 'node' | 'link' | 'reconnect';
-
-/** 连线拖拽状态（含重连） */
-interface LinkDragState {
-  active: boolean;
-  type: 'create' | 'reconnect';        // 新建连线 或 重连现有连线
-  sourceAnchorId: string;              // 源锚点ID（始终有效）
-  startX: number;                      // 起始画布X
-  startY: number;                      // 起始画布Y
-  connectionId?: string;               // 如果是重连模式，记录原连线ID
-  oldTargetAnchorId?: string;          // 如果是重连模式，记录原目标锚点ID（便于取消时恢复）
+/** 拖拽状态枚举 */
+enum DragState {
+  IDLE = 'idle',
+  NODE_DRAGGING = 'node_dragging',
+  LINK_DRAGGING = 'link_dragging',
+  HOVERING = 'hovering',
+  CONNECTED = 'connected',
 }
 
 export class DragManager {
-  private readonly chart: SvgFlowChart;
+  private state: DragState = DragState.IDLE;
+  private readonly chart: SvgEngine;
 
-  // 节点拖拽状态
-  private nodeDrag: {
-    active: boolean;
-    nodeId: string;
-    offset: Point;
+  private nodeDragData: { nodeId: string; offset: Point } | null = null;
+  private linkDragData: {
+    sourceAnchorId: string;
+    startX: number;
+    startY: number;
+    type: 'create' | 'reconnect';
+    connectionId?: string;
+    oldTargetAnchorId?: string;
   } | null = null;
 
-  // 连线拖拽状态（新建或重连）
-  private linkDrag: LinkDragState | null = null;
+  private highlightedAnchor: Anchor | null = null;
 
-  // 当前悬停的高亮锚点（用于取消高亮）
-  private highlightedAnchor: AnchorPoint | null = null;
+  // Raf 节流
+  private rafId: number | null = null;
+  private lastMoveEvent: MouseEvent | null = null;
 
-  constructor(chart: SvgFlowChart) {
+  constructor(chart: SvgEngine) {
     this.chart = chart;
     this.bindEvents();
   }
@@ -50,24 +49,22 @@ export class DragManager {
   private bindEvents() {
     const svg = this.chart.getSvgRoot();
     svg.addEventListener("mousedown", this.onMouseDown.bind(this));
-    window.addEventListener("mousemove", this.onMouseMove.bind(this));
+    window.addEventListener("mousemove", this.onMouseMove.bind(this), { passive: true });
     window.addEventListener("mouseup", this.onMouseUp.bind(this));
     window.addEventListener("keydown", this.onKeyDown.bind(this));
-    // 鼠标离开窗口时自动取消拖拽
     window.addEventListener("blur", this.cancelDrag.bind(this));
   }
 
-  // ==================== 鼠标事件 ====================
-
   private onMouseDown(evt: MouseEvent) {
-    const target = evt.target as SVGElement;
+    if (this.state !== DragState.IDLE) return;
 
-    // 如果点击的是锚点（circle），由锚点自己的事件处理，这里不处理
+    const target = evt.target as SVGElement;
+    // 锚点由 startLinkDrag 处理
     if (target.tagName === "circle" && target.hasAttribute("data-anchor-id")) {
       return;
     }
 
-    // 尝试查找节点
+    // 查找节点
     let nodeId: string | undefined;
     let el: SVGElement | null = target;
     while (el && !nodeId) {
@@ -76,7 +73,6 @@ export class DragManager {
       if (!parent) break;
       el = parent as unknown as SVGElement;
     }
-
     if (!nodeId) return;
 
     evt.stopPropagation();
@@ -84,133 +80,135 @@ export class DragManager {
     if (!node) return;
 
     const canvasPos = this.viewport.screenToCanvas({ x: evt.clientX, y: evt.clientY });
-    this.nodeDrag = {
-      active: true,
+    this.nodeDragData = {
       nodeId,
-      offset: {
-        x: canvasPos.x - node.x,
-        y: canvasPos.y - node.y,
-      },
+      offset: { x: canvasPos.x - node.x, y: canvasPos.y - node.y },
     };
-    // 不在此处选中，拖拽结束时再选中
+    this.state = DragState.NODE_DRAGGING;
   }
 
-  /**
-   * 对外暴露：从锚点启动连线拖拽（新建或重连）
-   * @param anchor 起始锚点
-   * @param evt 鼠标事件
-   * @param existingConnection 如果是重连模式，传入现有连线对象
-   */
-  startLinkDrag(anchor: AnchorPoint, evt: MouseEvent, existingConnection?: FlowConnection) {
-    // 空格平移时禁止拖拽
-    if (this.viewport.isSpaceActive()) return;
+  startLinkDrag(anchor: Anchor, evt: MouseEvent, existingConnection?: Connection) {
+    if (this.viewport.isSpaceActive() || this.state !== DragState.IDLE) return;
 
     const node = this.store.getNode(anchor.nodeId);
     if (!node) return;
     const anchorPos = this.store.calcAnchorPosForNode(node, anchor);
     const isReconnect = !!existingConnection;
 
-    // 如果是重连模式，进行必要校验
     if (isReconnect) {
       const conn = existingConnection!;
-      const isSource = conn.sourceAnchorId === anchor.id;
       const isTarget = conn.targetAnchorId === anchor.id;
-      if (!isSource && !isTarget) {
-        console.warn("尝试重连的锚点不属于该连线");
-        return;
-      }
-      // 目前只支持从目标端重连（更常用）
       if (!isTarget) {
         console.warn("目前只支持从目标端重连");
         return;
       }
+      this.linkDragData = {
+        sourceAnchorId: anchor.id,
+        startX: anchorPos.x,
+        startY: anchorPos.y,
+        type: 'reconnect',
+        connectionId: conn.id,
+        oldTargetAnchorId: conn.targetAnchorId,
+      };
+    } else {
+      this.linkDragData = {
+        sourceAnchorId: anchor.id,
+        startX: anchorPos.x,
+        startY: anchorPos.y,
+        type: 'create',
+      };
     }
 
-    // 初始化拖拽状态
-    this.linkDrag = {
-      active: true,
-      type: isReconnect ? 'reconnect' : 'create',
-      sourceAnchorId: anchor.id,
-      startX: anchorPos.x,
-      startY: anchorPos.y,
-      connectionId: existingConnection?.id,
-      oldTargetAnchorId: existingConnection?.targetAnchorId,
-    };
-
+    this.state = DragState.LINK_DRAGGING;
     evt.preventDefault();
     this.chart.getSvgRoot().style.cursor = "grabbing";
     this.clearHighlight();
   }
 
   private onMouseMove(evt: MouseEvent) {
+    // 只保存最新事件，用 raf 处理
+    this.lastMoveEvent = evt;
+    if (this.rafId === null) {
+      this.rafId = requestAnimationFrame(() => this.processMove());
+    }
+  }
+
+  private processMove() {
+    this.rafId = null;
+    if (!this.lastMoveEvent) return;
+    const evt = this.lastMoveEvent;
+    this.lastMoveEvent = null;
+
     const canvasPos = this.viewport.screenToCanvas({ x: evt.clientX, y: evt.clientY });
 
-    // 节点拖拽逻辑
-    if (this.nodeDrag?.active) {
-      const nodeId = this.nodeDrag.nodeId;
-      const newX = canvasPos.x - this.nodeDrag.offset.x;
-      const newY = canvasPos.y - this.nodeDrag.offset.y;
+    if (this.state === DragState.NODE_DRAGGING && this.nodeDragData) {
+      const { nodeId, offset } = this.nodeDragData;
+      const newX = canvasPos.x - offset.x;
+      const newY = canvasPos.y - offset.y;
       this.store.updateNode(nodeId, { x: newX, y: newY });
+      return;
     }
 
-    // 连线拖拽逻辑（新建或重连）
-    if (this.linkDrag?.active) {
-      // 更新临时虚线（从起始点画到鼠标当前位置）
+    if (this.state === DragState.LINK_DRAGGING && this.linkDragData) {
+      // 更新临时虚线（半透明灰色，并绘制端点圆点）
       this.renderer.setTempLine({
-        x1: this.linkDrag.startX,
-        y1: this.linkDrag.startY,
+        x1: this.linkDragData.startX,
+        y1: this.linkDragData.startY,
         x2: canvasPos.x,
         y2: canvasPos.y,
       });
 
-      // 检测鼠标下是否有可用的目标锚点（排除自身节点）
+      // 磁吸检测
       const hitAnchor = this.queryAnchorUnderMouse(evt);
-      const sourceAnchor = this.store.getAnchorPoint(this.linkDrag.sourceAnchorId);
+      const sourceAnchor = this.store.getAnchor(this.linkDragData.sourceAnchorId);
       const sourceNode = sourceAnchor ? this.store.getNode(sourceAnchor.nodeId) : null;
       const isValidTarget = hitAnchor && sourceNode && this.store.getNode(hitAnchor.nodeId)?.id !== sourceNode.id;
 
-      // 高亮处理
       if (isValidTarget && hitAnchor !== this.highlightedAnchor) {
         this.clearHighlight();
         this.highlightedAnchor = hitAnchor;
         this.renderer.highlightAnchor(hitAnchor.id, true);
+        this.state = DragState.HOVERING;
       } else if (!isValidTarget && this.highlightedAnchor) {
         this.clearHighlight();
+        this.state = DragState.LINK_DRAGGING;
       }
     }
   }
 
   private onMouseUp(evt: MouseEvent) {
-    // 恢复光标
     this.chart.getSvgRoot().style.cursor = "";
-
-    // ---- 处理节点拖拽结束 ----
-    if (this.nodeDrag) {
-      const nodeId = this.nodeDrag.nodeId;   // 先保存
-      this.selection.select("node", nodeId); // 选中节点
-      this.nodeDrag = null;                  // 最后清空
+    if (this.rafId !== null) {
+      cancelAnimationFrame(this.rafId);
+      this.rafId = null;
     }
 
-    // ---- 处理连线拖拽结束 ----
-    if (this.linkDrag?.active) {
-      const hitAnchor = this.queryAnchorUnderMouse(evt);
-      const sourceAnchor = this.store.getAnchorPoint(this.linkDrag.sourceAnchorId);
-      const isReconnect = this.linkDrag.type === 'reconnect';
+    // 处理节点拖拽结束
+    if (this.state === DragState.NODE_DRAGGING && this.nodeDragData) {
+      const nodeId = this.nodeDragData.nodeId;
+      this.selection.select("node", nodeId);
+      this.nodeDragData = null;
+      this.state = DragState.IDLE;
+      return;
+    }
 
+    // 处理连线拖拽结束
+    if ((this.state === DragState.LINK_DRAGGING || this.state === DragState.HOVERING) && this.linkDragData) {
+      const hitAnchor = this.queryAnchorUnderMouse(evt);
+      const sourceAnchor = this.store.getAnchor(this.linkDragData.sourceAnchorId);
+      const isReconnect = this.linkDragData.type === 'reconnect';
       let success = false;
+
       if (hitAnchor && sourceAnchor) {
         const sourceNode = this.store.getNode(sourceAnchor.nodeId);
         const targetNode = this.store.getNode(hitAnchor.nodeId);
-        // 禁止自连接
         if (sourceNode && targetNode && sourceNode.id !== targetNode.id) {
           if (isReconnect) {
-            // 重连模式：更新现有连线
-            const connId = this.linkDrag.connectionId;
+            const connId = this.linkDragData.connectionId;
             if (connId) {
               const conn = this.store.getConnection(connId);
               if (conn) {
                 if (conn.targetAnchorId !== hitAnchor.id) {
-                  // 查重
                   const exist = this.store.getAllConnections().some(c =>
                     c.id !== connId &&
                     c.sourceAnchorId === sourceAnchor.id &&
@@ -219,17 +217,11 @@ export class DragManager {
                   if (!exist) {
                     this.store.updateConnection(connId, { targetAnchorId: hitAnchor.id });
                     success = true;
-                  } else {
-                    console.warn("连线已存在，重连取消");
                   }
-                } else {
-                  // 目标未变化，视为取消
-                  success = false;
                 }
               }
             }
           } else {
-            // 新建连线
             const exist = this.store.getAllConnections().some(c =>
               c.sourceAnchorId === sourceAnchor.id && c.targetAnchorId === hitAnchor.id
             );
@@ -243,86 +235,70 @@ export class DragManager {
                 strokeWidth: 2,
               });
               success = true;
-            } else {
-              console.warn("连线已存在，创建取消");
             }
           }
         }
       }
 
-      // 如果操作失败，且是重连模式，恢复原目标锚点
       if (!success && isReconnect) {
-        const connId = this.linkDrag.connectionId;
-        const oldTargetId = this.linkDrag.oldTargetAnchorId;
+        const connId = this.linkDragData.connectionId;
+        const oldTargetId = this.linkDragData.oldTargetAnchorId;
         if (connId && oldTargetId) {
           this.store.updateConnection(connId, { targetAnchorId: oldTargetId });
         }
       }
 
-      // 清除高亮和临时虚线
       this.clearHighlight();
       this.renderer.clearTempLine();
-
-      // 清空拖拽状态
-      this.linkDrag = null;
+      this.linkDragData = null;
+      this.state = DragState.IDLE;
     }
   }
 
-  // ==================== 键盘事件 ====================
-
   private onKeyDown(evt: KeyboardEvent) {
-    // ESC 取消当前拖拽
     if (evt.key === "Escape") {
       this.cancelDrag();
       return;
     }
 
-    // Delete / Backspace 删除选中的节点或连线
-    if (evt.key !== "Delete" && evt.key !== "Backspace") return;
-    const sel = this.selection.getSelection();
-    if (!sel.type || sel.type === "anchorPoint" || !sel.id) return;
-
-    const confirmMsg = sel.type === "node"
-      ? "确定删除节点（关联锚点、连线会一并清除）？"
-      : "确定删除当前连线？";
-    if (!window.confirm(confirmMsg)) return;
-
-    if (sel.type === "node") {
-      this.store.removeNode(sel.id);
-    } else if (sel.type === "connection") {
-      this.store.removeConnection(sel.id);
+    if (evt.key === "Delete" || evt.key === "Backspace") {
+      const sel = this.selection.getSelection();
+      if (!sel.type || sel.type === "anchor" || !sel.id) return;
+      const confirmMsg = sel.type === "node"
+        ? "确定删除节点（关联锚点、连线会一并清除）？"
+        : "确定删除当前连线？";
+      if (!window.confirm(confirmMsg)) return;
+      if (sel.type === "node") {
+        this.store.removeNode(sel.id);
+      } else if (sel.type === "connection") {
+        this.store.removeConnection(sel.id);
+      }
+      this.selection.clear();
     }
-    this.selection.clear();
   }
 
-  // ==================== 辅助方法 ====================
-
-  /**
-   * 取消当前所有拖拽操作（ESC 或窗口失焦）
-   */
   private cancelDrag() {
-    // 清除高亮
-    this.clearHighlight();
-    // 清除临时虚线
-    if (this.renderer) {
-      this.renderer.clearTempLine();
+    if (this.rafId !== null) {
+      cancelAnimationFrame(this.rafId);
+      this.rafId = null;
     }
-    // 恢复光标
+    this.clearHighlight();
+    this.renderer.clearTempLine();
     this.chart.getSvgRoot().style.cursor = "";
 
-    // 如果是重连模式，恢复原目标锚点
-    if (this.linkDrag?.type === 'reconnect' && this.linkDrag.connectionId && this.linkDrag.oldTargetAnchorId) {
-      this.store.updateConnection(this.linkDrag.connectionId, { targetAnchorId: this.linkDrag.oldTargetAnchorId });
+    if (this.state === DragState.HOVERING && this.linkDragData?.type === 'reconnect') {
+      const connId = this.linkDragData.connectionId;
+      const oldTargetId = this.linkDragData.oldTargetAnchorId;
+      if (connId && oldTargetId) {
+        this.store.updateConnection(connId, { targetAnchorId: oldTargetId });
+      }
     }
 
-    // 清空拖拽状态
-    this.nodeDrag = null;
-    this.linkDrag = null;
+    this.nodeDragData = null;
+    this.linkDragData = null;
+    this.state = DragState.IDLE;
   }
 
-  /**
-   * 清除当前高亮的锚点
-   */
   private clearHighlight() {
     if (this.highlightedAnchor) {
       this.renderer.highlightAnchor(this.highlightedAnchor.id, false);
@@ -330,32 +306,25 @@ export class DragManager {
     }
   }
 
-  /**
-   * 查询鼠标下方最近的锚点（磁吸）
-   */
-  private queryAnchorUnderMouse(evt: MouseEvent): AnchorPoint | undefined {
-    const screenPoint = { x: evt.clientX, y: evt.clientY };
-    const canvasPoint = this.viewport.screenToCanvas(screenPoint);
-    const allAnchors = this.store.getAllAnchorPoints();
-    const hitRadius = 22; // 磁吸半径
-
-    let closest: AnchorPoint | undefined;
+  private queryAnchorUnderMouse(evt: MouseEvent): Anchor | undefined {
+    const canvasPoint = this.viewport.screenToCanvas({ x: evt.clientX, y: evt.clientY });
+    const allAnchors = this.store.getAllAnchors();
+    const hitRadius = 22;
+    let closest: Anchor | undefined;
     let minDist = hitRadius;
 
     for (const ap of allAnchors) {
       const node = this.store.getNode(ap.nodeId);
       if (!node) continue;
       const pos = this.store.calcAnchorPosForNode(node, ap);
-      const distance = Math.hypot(canvasPoint.x - pos.x, canvasPoint.y - pos.y);
-      if (distance < minDist) {
-        minDist = distance;
+      const dist = Math.hypot(canvasPoint.x - pos.x, canvasPoint.y - pos.y);
+      if (dist < minDist) {
+        minDist = dist;
         closest = ap;
       }
     }
     return closest;
   }
-
-  // ==================== 销毁清理 ====================
 
   destroy() {
     const svg = this.chart.getSvgRoot();
