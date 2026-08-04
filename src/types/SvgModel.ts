@@ -62,6 +62,7 @@ export interface ArrowConfig {
     length?: number;
     width?: number;
     color?: string;
+    foldback?: number; // 新增：折叠系数
 }
 
 // ==================== 实体接口 ====================
@@ -94,7 +95,7 @@ export interface Anchor {
     offset?: Point;                     // 额外偏移
     perimeterTotal?: number;            // 仅 PERIMETER 有效
     perimeterIndex?: number;            // 仅 PERIMETER 有效
-    visible?: boolean;
+    visible?: boolean;                  // 默认 true，设为 false 则不渲染
     data?: Record<string, unknown>;
 }
 

@@ -8,6 +8,10 @@ import { DragManager } from "../interaction/DragManager";
 import type { SelectionManager } from "../selection/SelectionManager";
 import { createContextMenu, createMenuItem, createSvgElement } from "../../utils/dom";
 import { NodeShape } from "../../types/SvgModel";
+import { ConnectorType } from "../../types";
+import { connectorBezier } from "../../calc/connector/bezier";
+import { connectorFlowchart } from "../../calc/connector/flowchart";
+
 
 export class SvgRenderer {
   private readonly chart: SvgEngine;
@@ -74,7 +78,7 @@ export class SvgRenderer {
   }
 
   // 临时连线（带端点圆点，半透明灰色）
-  setTempLine(pos: { x1: number; y1: number; x2: number; y2: number }): void {
+  setTempLine(pos: { x1: number; y1: number; x2: number; y2: number }, connectorType?: ConnectorType): void {
     if (!this.tempLineGroup) {
       this.tempLineGroup = createSvgElement("g") as SVGGElement;
       this.tempLineGroup.setAttribute("pointer-events", "none");
@@ -95,7 +99,21 @@ export class SvgRenderer {
       this.layerManager.connectionLayer.appendChild(this.tempLineGroup);
     }
 
-    this.tempLineEl!.setAttribute("d", `M${pos.x1} ${pos.y1} L${pos.x2} ${pos.y2}`);
+     // 根据连线类型生成路径
+    let pathD: string;
+    const start = { x: pos.x1, y: pos.y1 };
+    const end = { x: pos.x2, y: pos.y2 };
+
+    if (connectorType === ConnectorType.FLOWCHART) {
+      // 直接使用 flowchart 算法生成折线预览
+      pathD = connectorFlowchart(start, end, 30); // 复用 calc/connector/flowchart.ts
+    } else if (connectorType === ConnectorType.BEZIER) {
+      pathD = connectorBezier(start, end, 0.5, 40);
+    } else {
+      pathD = `M${pos.x1} ${pos.y1} L${pos.x2} ${pos.y2}`;
+    }
+
+    this.tempLineEl!.setAttribute("d", pathD);
     this.tempDotEl!.setAttribute("cx", String(pos.x2));
     this.tempDotEl!.setAttribute("cy", String(pos.y2));
   }

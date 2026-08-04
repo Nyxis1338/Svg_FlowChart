@@ -29,6 +29,10 @@ export class SvgEngine {
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg") as SVGSVGElement;
     container.appendChild(svg);
     this.svgRoot = svg;
+    
+    // ★ 添加 defs（阴影、发光）
+    this.addDefs(svg);
+
     this.store = new Store();
     this.viewport = new ViewportManager(this.svgRoot);
     this.selection = new SelectionManager();
@@ -37,12 +41,46 @@ export class SvgEngine {
     this.renderer = new SvgRenderer(this);
   }
 
+  private addDefs(svg: SVGSVGElement): void {
+    const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+
+    // 节点默认阴影
+    const shadow = document.createElementNS("http://www.w3.org/2000/svg", "filter");
+    shadow.setAttribute("id", "node-shadow");
+    shadow.setAttribute("x", "-10%");
+    shadow.setAttribute("y", "-10%");
+    shadow.setAttribute("width", "130%");
+    shadow.setAttribute("height", "130%");
+    shadow.innerHTML = `<feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="rgba(0,0,0,0.10)"/>`;
+    defs.appendChild(shadow);
+
+    // 节点选中发光（红色）
+    const glow = document.createElementNS("http://www.w3.org/2000/svg", "filter");
+    glow.setAttribute("id", "node-selected-glow");
+    glow.setAttribute("x", "-20%");
+    glow.setAttribute("y", "-20%");
+    glow.setAttribute("width", "140%");
+    glow.setAttribute("height", "140%");
+    glow.innerHTML = `<feDropShadow dx="0" dy="0" stdDeviation="6" flood-color="#ff6b6b" flood-opacity="0.6"/>`;
+    defs.appendChild(glow);
+
+    svg.prepend(defs);
+  }
+
   getSvgRoot(): SVGSVGElement {
     return this.svgRoot;
   }
 
   // ==================== 节点操作 ====================
+  /** 添加纯节点（不自动生成锚点） */
   addNode(data: Omit<Node, "id">): Node {
+    const id = `node-${uuidv4()}`;
+    const node: Node = { id, ...data };
+    return this.store.addNode(node);
+  }
+
+  /** 添加节点并自动生成8个静态锚点 */
+  addNodeWithAnchors(data: Omit<Node, "id">): Node {
     return this.store.addNodeWithAnchors(data);
   }
 
@@ -66,8 +104,7 @@ export class SvgEngine {
   addConnection(data: Omit<Connection, "id">): Connection {
     const id = `connect-${uuidv4()}`;
     const conn: Connection = { id, ...data };
-    this.store.addConnection(conn);
-    return conn;
+    return this.store.addConnection(conn);
   }
 
   getConnection(id: string): Connection | undefined {
@@ -90,8 +127,7 @@ export class SvgEngine {
   addAnchor(data: Omit<Anchor, "id">): Anchor {
     const id = `anchor-${uuidv4()}`;
     const anchor: Anchor = { id, ...data };
-    this.store.addAnchor(anchor);
-    return anchor;
+    return this.store.addAnchor(anchor);
   }
 
   getAllAnchors(): Anchor[] {

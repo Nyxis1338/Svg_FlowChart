@@ -14,7 +14,7 @@ export class LayerManager {
     this.nodeLayer = createSvgElement("g") as SVGGElement;
     this.anchorLayer = createSvgElement("g") as SVGGElement;
 
-    this.rootGroup.append(this.bgLayer, this.connectionLayer, this.nodeLayer, this.anchorLayer);
+    this.rootGroup.append(this.bgLayer, this.nodeLayer,this.connectionLayer,  this.anchorLayer);
     parent.appendChild(this.rootGroup);
   }
 

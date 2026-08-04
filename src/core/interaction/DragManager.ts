@@ -156,7 +156,9 @@ export class DragManager {
         y1: this.linkDragData.startY,
         x2: canvasPos.x,
         y2: canvasPos.y,
-      });
+      },
+      ConnectorType.FLOWCHART // 或从连线配置中读取
+      );
 
       // 磁吸检测
       const hitAnchor = this.queryAnchorUnderMouse(evt);

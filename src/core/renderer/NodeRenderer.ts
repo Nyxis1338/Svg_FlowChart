@@ -22,22 +22,23 @@ export class NodeRenderer {
       g.setAttribute("data-node-id", node.id);
 
       const isSelected = this.selection.isSelected("node", node.id);
-      const strokeColor = isSelected ? "#ff6622" : (node.stroke || "#5588dd");
+      // ★ 默认边框为浅灰色，选中为红色
+      const strokeColor = isSelected ? "#ff6b6b" : (node.stroke || "#d0d7de");
       const strokeWidth = isSelected ? 3 : (node.strokeWidth || 2);
 
       let shapeEl: SVGElement;
       switch (node.shape) {
         case NodeShape.CIRCLE:
-          shapeEl = this.createCircle(node, strokeColor, strokeWidth);
+          shapeEl = this.createCircle(node, strokeColor, strokeWidth, isSelected);
           break;
         case NodeShape.DIAMOND:
-          shapeEl = this.createDiamond(node, strokeColor, strokeWidth);
+          shapeEl = this.createDiamond(node, strokeColor, strokeWidth, isSelected);
           break;
         case NodeShape.ELLIPSE:
-          shapeEl = this.createEllipse(node, strokeColor, strokeWidth);
+          shapeEl = this.createEllipse(node, strokeColor, strokeWidth, isSelected);
           break;
         default:
-          shapeEl = this.createRect(node, strokeColor, strokeWidth);
+          shapeEl = this.createRect(node, strokeColor, strokeWidth, isSelected);
           break;
       }
 
@@ -48,8 +49,9 @@ export class NodeRenderer {
         text.setAttribute("x", String(node.x + node.width / 2));
         text.setAttribute("y", String(node.y + node.height / 2 + 6));
         text.setAttribute("text-anchor", "middle");
-        text.setAttribute("fill", "#222222");
+        text.setAttribute("fill", "#333333"); // 深色字体，更清晰
         text.setAttribute("font-size", "14");
+        text.setAttribute("font-family", "sans-serif");
         text.textContent = node.label;
         g.appendChild(text);
       }
@@ -64,20 +66,28 @@ export class NodeRenderer {
     }
   }
 
-  private createRect(node: Node, stroke: string, strokeWidth: number): SVGRectElement {
+  private createRect(node: Node, stroke: string, strokeWidth: number, isSelected: boolean): SVGRectElement {
     const rect = createSvgElement("rect") as SVGRectElement;
     rect.setAttribute("x", String(node.x));
     rect.setAttribute("y", String(node.y));
     rect.setAttribute("width", String(node.width));
     rect.setAttribute("height", String(node.height));
-    rect.setAttribute("rx", "6");
+    rect.setAttribute("rx", "8");
+    rect.setAttribute("ry", "8");
     rect.setAttribute("fill", node.fill || "#ffffff");
     rect.setAttribute("stroke", stroke);
     rect.setAttribute("stroke-width", String(strokeWidth));
+
+    // ★ 阴影：默认使用节点阴影，选中时使用发光滤镜
+    if (isSelected) {
+      rect.setAttribute("filter", "url(#node-selected-glow)");
+    } else {
+      rect.setAttribute("filter", "url(#node-shadow)");
+    }
     return rect;
   }
 
-  private createCircle(node: Node, stroke: string, strokeWidth: number): SVGCircleElement {
+  private createCircle(node: Node, stroke: string, strokeWidth: number, isSelected: boolean): SVGCircleElement {
     const circle = createSvgElement("circle") as SVGCircleElement;
     const cx = node.x + node.width / 2;
     const cy = node.y + node.height / 2;
@@ -88,10 +98,15 @@ export class NodeRenderer {
     circle.setAttribute("fill", node.fill || "#ffffff");
     circle.setAttribute("stroke", stroke);
     circle.setAttribute("stroke-width", String(strokeWidth));
+    if (isSelected) {
+      circle.setAttribute("filter", "url(#node-selected-glow)");
+    } else {
+      circle.setAttribute("filter", "url(#node-shadow)");
+    }
     return circle;
   }
 
-  private createDiamond(node: Node, stroke: string, strokeWidth: number): SVGPolygonElement {
+  private createDiamond(node: Node, stroke: string, strokeWidth: number, isSelected: boolean): SVGPolygonElement {
     const poly = createSvgElement("polygon") as SVGPolygonElement;
     const cx = node.x + node.width / 2;
     const cy = node.y + node.height / 2;
@@ -102,10 +117,15 @@ export class NodeRenderer {
     poly.setAttribute("fill", node.fill || "#ffffff");
     poly.setAttribute("stroke", stroke);
     poly.setAttribute("stroke-width", String(strokeWidth));
+    if (isSelected) {
+      poly.setAttribute("filter", "url(#node-selected-glow)");
+    } else {
+      poly.setAttribute("filter", "url(#node-shadow)");
+    }
     return poly;
   }
 
-  private createEllipse(node: Node, stroke: string, strokeWidth: number): SVGEllipseElement {
+  private createEllipse(node: Node, stroke: string, strokeWidth: number, isSelected: boolean): SVGEllipseElement {
     const ellipse = createSvgElement("ellipse") as SVGEllipseElement;
     const cx = node.x + node.width / 2;
     const cy = node.y + node.height / 2;
@@ -118,6 +138,11 @@ export class NodeRenderer {
     ellipse.setAttribute("fill", node.fill || "#ffffff");
     ellipse.setAttribute("stroke", stroke);
     ellipse.setAttribute("stroke-width", String(strokeWidth));
+    if (isSelected) {
+      ellipse.setAttribute("filter", "url(#node-selected-glow)");
+    } else {
+      ellipse.setAttribute("filter", "url(#node-shadow)");
+    }
     return ellipse;
   }
 }

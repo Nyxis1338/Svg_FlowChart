@@ -30,9 +30,10 @@ export class Store {
   }
 
   // ==================== Node 操作 ====================
-  addNode(node: Node) {
+  addNode(node: Node): Node {
     this.nodes.set(node.id, structuredClone(node));
     this.notify("node");
+    return node;
   }
 
   getNode(nodeId: string): Node | undefined {
@@ -65,9 +66,10 @@ export class Store {
   }
 
   // ==================== Anchor 操作 ====================
-  addAnchor(anchor: Anchor) {
+  addAnchor(anchor: Anchor): Anchor {
     this.anchors.set(anchor.id, structuredClone(anchor));
     this.notify("anchor");
+    return anchor;
   }
 
   getAnchor(anchorId: string): Anchor | undefined {
@@ -264,12 +266,11 @@ export class Store {
   }
 
   // ==================== Connection 操作 ====================
-  addConnection(conn: Connection) {
-    if (!conn.connectorType) {
-      conn.connectorType = ConnectorType.FLOWCHART;
-    }
+  addConnection(conn: Connection): Connection {
+    if (!conn.connectorType) conn.connectorType = ConnectorType.FLOWCHART;
     this.connections.set(conn.id, structuredClone(conn));
     this.notify("connection");
+    return conn;
   }
 
   getConnection(connId: string): Connection | undefined {
@@ -314,6 +315,15 @@ export class Store {
       const targetNode = this.getNode(conn.targetNodeId);
       if (!sourceNode || !targetNode) return null;
       const { source, target } = getContinuousAnchorPair(sourceNode, targetNode);
+
+        // 🔍 调试输出
+  console.log('=== 连续锚点调试 ===');
+  console.log('源节点:', sourceNode.id, '矩形:', { x: sourceNode.x, y: sourceNode.y, w: sourceNode.width, h: sourceNode.height });
+  console.log('目标节点:', targetNode.id, '矩形:', { x: targetNode.x, y: targetNode.y, w: targetNode.width, h: targetNode.height });
+  console.log('计算出的源端点:', source);
+  console.log('计算出的目标端点:', target);
+  console.log('目标端点是否在节点边缘? 预期应在 (', targetNode.x, '~', targetNode.x + targetNode.width, ', ', targetNode.y, '~', targetNode.y + targetNode.height, ') 的边上');
+      
       const pathD = generatePath(conn.connectorType, source, target);
       return { start: source, end: target, pathD };
     }
