@@ -30,9 +30,6 @@ export class ViewportManager {
 
     this.bindEvents();
     this.applyTransform();
-
-    // 🔍 初始坐标转换测试（打开控制台查看）
-    console.log('ViewportManager 初始化: translate=', this.translate, 'scale=', this.scale);
   }
 
   subscribe(cb: () => void) {
@@ -171,20 +168,28 @@ export class ViewportManager {
     );
   }
 
-  // ========== 坐标转换 ==========
+  /**
+   * 屏幕坐标 → 画布逻辑坐标
+   * 先减去 SVG 根元素偏移，再应用 transform
+   */
   screenToCanvas(point: Point): Point {
-    // 从屏幕坐标转换到画布逻辑坐标
+    const rect = this.svg.getBoundingClientRect();
+    const x = point.x - rect.left;
+    const y = point.y - rect.top;
     return {
-      x: (point.x - this.translate.x) / this.scale,
-      y: (point.y - this.translate.y) / this.scale,
+      x: (x - this.translate.x) / this.scale,
+      y: (y - this.translate.y) / this.scale,
     };
   }
 
+  /**
+   * 画布逻辑坐标 → 屏幕坐标
+   */
   canvasToScreen(point: Point): Point {
-    return {
-      x: point.x * this.scale + this.translate.x,
-      y: point.y * this.scale + this.translate.y,
-    };
+    const rect = this.svg.getBoundingClientRect();
+    const x = point.x * this.scale + this.translate.x + rect.left;
+    const y = point.y * this.scale + this.translate.y + rect.top;
+    return { x, y };
   }
 
   isSpaceActive(): boolean {
@@ -196,8 +201,8 @@ export class ViewportManager {
   }
 
   destroy() {
-    window.removeEventListener('keydown', this.onKeyDown.bind(this), true);
-    window.removeEventListener('keyup', this.onKeyUp.bind(this), true);
+    window.removeEventListener('keydown', this.onKeyDown.bind(this));
+    window.removeEventListener('keyup', this.onKeyUp.bind(this));
     this.svg.removeEventListener('mousedown', this.onMouseDown.bind(this));
     window.removeEventListener('mousemove', this.onMouseMove.bind(this));
     this.svg.removeEventListener('wheel', this.onWheel);

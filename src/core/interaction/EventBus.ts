@@ -31,14 +31,44 @@ export class EventBus {
   }
 
   private onMouseDown(e: MouseEvent) {
+    const screenX = e.clientX;
+    const screenY = e.clientY;
+    const canvasPos = this.chart.viewport.screenToCanvas({ x: screenX, y: screenY });
+    console.log(
+      `🖱️ mousedown: screen(${screenX}, ${screenY}) -> canvas(${canvasPos.x.toFixed(1)}, ${canvasPos.y.toFixed(1)})`
+    );
+
     const target = e.target as SVGElement;
 
-    // 检测锚点
     if (target.tagName === 'circle' && target.hasAttribute('data-anchor-id')) {
       const anchorId = target.getAttribute('data-anchor-id')!;
       const anchor = this.store.getAnchor(anchorId);
       if (anchor) {
-        // 启动拖拽，但不阻止事件冒泡（允许 click 事件触发）
+        const node = this.store.getNode(anchor.nodeId);
+        console.log(`⚓ 点击锚点 (mousedown): ${anchorId}`);
+        if (node) {
+          console.log(
+            `  节点: ${node.label || '未命名'} 坐标: (${node.x}, ${node.y}) 尺寸: ${node.width}x${node.height}`
+          );
+          console.log(`  方向: ${anchor.direction}`); // 新增
+          const anchorPos = this.store.calcAnchorPosForNode(node, anchor);
+          console.log(`  锚点逻辑位置 (calcAnchorPosForNode): (${anchorPos.x.toFixed(1)}, ${anchorPos.y.toFixed(1)})`);
+          // 手动计算锚点位置
+          if (anchor.type === 'static' && anchor.position) {
+            const manualPos = this.calcManualAnchorPos(node, anchor.position);
+            // console.log(`  手动计算锚点位置: (${manualPos.x.toFixed(1)}, ${manualPos.y.toFixed(1)})`);
+          }
+          // console.log(`  鼠标画布位置: (${canvasPos.x.toFixed(1)}, ${canvasPos.y.toFixed(1)})`);
+          // console.log(
+          //   `  偏差: dx=${(canvasPos.x - anchorPos.x).toFixed(1)}, dy=${(canvasPos.y - anchorPos.y).toFixed(1)}`
+          // );
+
+          // 获取实际 DOM 元素的 cx/cy
+          const circle = target as SVGCircleElement;
+          const actualCx = circle.getAttribute('cx');
+          const actualCy = circle.getAttribute('cy');
+          console.log(`  🔍 实际 DOM cx/cy: (${actualCx}, ${actualCy})`);
+        }
         this.dragManager.startLinkDrag(anchor, e);
         return;
       }
@@ -54,6 +84,7 @@ export class EventBus {
       el = parent as unknown as SVGElement;
     }
     if (connId) {
+      console.log(`🔗 选中连线: ${connId}`);
       this.selection.select('connection', connId);
       return;
     }
@@ -68,41 +99,38 @@ export class EventBus {
       nodeEl = parent as unknown as SVGElement;
     }
     if (nodeId) {
+      console.log(`📦 点击节点: ${nodeId}`);
       this.dragManager.startNodeDrag(e);
       return;
     }
 
-    // 点击空白区域清空选中
+    // 点击空白区域
     if (target === this.chart.getSvgRoot() || target.tagName === 'svg') {
+      console.log('⬜ 点击空白区域，清空选中');
       this.selection.clear();
     }
   }
 
-  private onClick(e: MouseEvent) {
-    const target = e.target as SVGElement;
-    console.log('click event fired');
-    if (target.tagName === 'circle' && target.hasAttribute('data-anchor-id')) {
-      const anchorId = target.getAttribute('data-anchor-id')!;
-      const anchor = this.store.getAnchor(anchorId);
-      if (anchor) {
-        const node = this.store.getNode(anchor.nodeId);
-        console.log('🔍 点击锚点:', {
-          id: anchor.id,
-          nodeId: anchor.nodeId,
-          nodeLabel: node?.label || '未知',
-          position: anchor.position,
-          direction: anchor.direction,
-          type: anchor.type,
-          radius: anchor.radius,
-          fill: anchor.fill,
-          stroke: anchor.stroke,
-          connections: this.store
-            .getAllConnections()
-            .filter(c => c.sourceAnchorId === anchor.id || c.targetAnchorId === anchor.id)
-            .map(c => c.id),
-        });
-      }
+  // 手动计算锚点位置（用于对比）
+  private calcManualAnchorPos(node: any, position: string): { x: number; y: number } {
+    const cx = node.x + node.width / 2;
+    const cy = node.y + node.height / 2;
+    switch (position) {
+      case 'top':
+        return { x: cx, y: node.y };
+      case 'right':
+        return { x: node.x + node.width, y: cy };
+      case 'bottom':
+        return { x: cx, y: node.y + node.height };
+      case 'left':
+        return { x: node.x, y: cy };
+      default:
+        return { x: cx, y: cy };
     }
+  }
+
+  private onClick(e: MouseEvent) {
+    // 保留原逻辑，但不做操作
   }
 
   private onContextMenu(e: MouseEvent) {

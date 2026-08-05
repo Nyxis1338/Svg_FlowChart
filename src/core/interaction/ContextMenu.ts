@@ -28,7 +28,7 @@ export class ContextMenu {
 
     this.menuEl.innerHTML = '';
 
-    // 向上查找节点ID
+    // 查找节点ID
     let nodeId: string | undefined;
     let el: SVGElement | null = target;
     while (el && !nodeId) {
@@ -38,7 +38,7 @@ export class ContextMenu {
       el = parent as unknown as SVGElement;
     }
 
-    // 向上查找连线ID
+    // 查找连线ID
     let connId: string | undefined;
     el = target;
     while (el && !connId) {
@@ -48,8 +48,14 @@ export class ContextMenu {
       el = parent as unknown as SVGElement;
     }
 
+    // 空白区域：不显示菜单
+    if (!nodeId && !connId) {
+      this.hide();
+      return;
+    }
+
+    // 构建菜单项
     if (nodeId) {
-      // 节点菜单：图层控制
       const upItem = createMenuItem('⬆ 上移一层', () => {
         this.moveNode(nodeId, 'up');
         this.hide();
@@ -71,7 +77,6 @@ export class ContextMenu {
       this.menuEl.appendChild(topItem);
       this.menuEl.appendChild(bottomItem);
     } else if (connId) {
-      // 连线菜单：删除
       const delItem = createMenuItem('🗑 删除连线', () => {
         this.store.deleteSelected('connection', connId);
         this.selection.clear();
@@ -79,7 +84,6 @@ export class ContextMenu {
       });
       this.menuEl.appendChild(delItem);
     }
-    // 空白区域：无菜单项
 
     // 定位菜单
     const menuW = 130,
