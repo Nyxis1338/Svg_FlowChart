@@ -1,39 +1,35 @@
-// 复刻 jsPlumb PerimeterAnchor 逻辑：
-// 支持在矩形边框均匀生成 N 个锚点，0~1 索引循环获取
+// src/calc/anchor/perimeter.ts
 
-import type { Point, Rect } from "../../types/geometry";
-import { Geometry } from "../geometry";
+import type { Point, Rect } from '../../types/geometry';
+import { Geometry } from '../geometry';
 
 /**
- * 沿矩形周长均匀分布锚点
- * @param rect 节点包围盒
- * @param count 锚点总数（必须 > 0）
- * @param index 当前锚点索引 0 ~ count-1
- * @returns 锚点在画布上的坐标
+ * 沿矩形周长均匀分布锚点（核心算法）
  */
-export function computePerimeterAnchor(rect: Rect, count: number, index: number): Point {
-  // 参数校验
+function computePerimeterAnchor(rect: Rect, count: number, index: number): Point {
   if (count <= 0) {
-    console.warn("PerimeterAnchor: count must be > 0, using default center");
     return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
   }
-
-  // 安全取模，支持负索引
   const safeIndex = ((index % count) + count) % count;
   const proportion = safeIndex / count;
-
-  // 按周长比例计算点位置
   return Geometry.pointOnPerimeter(rect, proportion);
 }
 
 /**
- * 一次性获取全部周边锚点数组
+ * 获取单个周长锚点
  */
-export function getAllPerimeterAnchors(rect: Rect, count: number): Point[] {
-  if (count <= 0) return [];
+export function getPerimeterAnchor(rect: Rect, total: number, idx: number): Point {
+  return computePerimeterAnchor(rect, total, idx);
+}
+
+/**
+ * 获取全部周长锚点列表
+ */
+export function getPerimeterAnchorList(rect: Rect, total: number): Point[] {
+  if (total <= 0) return [];
   const list: Point[] = [];
-  for (let i = 0; i < count; i++) {
-    list.push(computePerimeterAnchor(rect, count, i));
+  for (let i = 0; i < total; i++) {
+    list.push(computePerimeterAnchor(rect, total, i));
   }
   return list;
 }

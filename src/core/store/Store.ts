@@ -1,25 +1,31 @@
 // src/core/store/Store.ts
 
-import type { Point, Rect } from "../../types/geometry";
-import type { Anchor, Node, Connection } from "../../types/SvgModel";
-import { NodeShape, AnchorType, ConnectorType, AnchorPosition } from "../../types/SvgModel";
-import { getContinuousAnchorPair, getStaticAnchor, getPerimeterAnchor, generatePath, generatePathWithOptions } from "../../calc";
-import { uuidv4 } from "../../utils/uuid";
-import type { StaticAnchorType } from "../../calc/anchor";
+import type { Point, Rect } from '../../types/geometry';
+import type { Anchor, Node, Connection } from '../../types/SvgModel';
+import { NodeShape, AnchorType, ConnectorType, AnchorPosition } from '../../types/SvgModel';
+import { getContinuousAnchorPair } from '../../calc';
+import { uuidv4 } from '../../utils/uuid';
+import { Defaults } from '../../styles/defaults';
 
-type StoreChangeType = "node" | "anchor" | "connection";
+// ==================== 类型定义 ====================
+type StoreChangeType = 'node' | 'anchor' | 'connection';
 type StoreChangeListener = (type: StoreChangeType) => void;
-type SelectableType = "node" | "anchor" | "connection" | null;
+type SelectableType = 'node' | 'anchor' | 'connection' | null;
 
-/**
- * 数据仓库：管理所有节点、锚点、连线，并通知视图更新
- */
+export interface StoreData {
+  nodes: Node[];
+  anchors: Anchor[];
+  connections: Connection[];
+}
+
+// ==================== Store 类 ====================
 export class Store {
   private nodes = new Map<string, Node>();
   private anchors = new Map<string, Anchor>();
   private connections = new Map<string, Connection>();
   private listeners = new Set<StoreChangeListener>();
 
+  // ---- 订阅 ----
   subscribe(fn: StoreChangeListener) {
     this.listeners.add(fn);
     return () => this.listeners.delete(fn);
@@ -29,10 +35,10 @@ export class Store {
     this.listeners.forEach(fn => fn(changeType));
   }
 
-  // ==================== Node 操作 ====================
+  // ---- Node 操作 ----
   addNode(node: Node): Node {
     this.nodes.set(node.id, structuredClone(node));
-    this.notify("node");
+    this.notify('node');
     return node;
   }
 
@@ -41,34 +47,35 @@ export class Store {
     return raw ? structuredClone(raw) : undefined;
   }
 
-  updateNode(nodeId: string, patch: Partial<Node>) {
+  updateNode(nodeId: string, patch: Partial<Node>): void {
     const node = this.nodes.get(nodeId);
     if (!node) return;
     Object.assign(node, patch);
-    this.notify("node");
+    this.notify('node');
   }
 
-  removeNode(nodeId: string) {
+  removeNode(nodeId: string): void {
+    // 1. 先删除所有锚点（同时删除关联连线）
+    this.removeAllAnchors(nodeId);
+    // 2. 删除节点本身
     this.nodes.delete(nodeId);
-    // 级联删除锚点
-    [...this.anchors.values()]
-      .filter(a => a.nodeId === nodeId)
-      .forEach(a => this.anchors.delete(a.id));
-    // 级联删除连线（节点直连模式）
-    [...this.connections.values()]
-      .filter(c => c.sourceNodeId === nodeId || c.targetNodeId === nodeId)
-      .forEach(c => this.connections.delete(c.id));
-    this.notify("node");
+    // 3. 删除节点直连模式的连线（如果有）
+    for (const [id, c] of this.connections) {
+      if (c.sourceNodeId === nodeId || c.targetNodeId === nodeId) {
+        this.connections.delete(id);
+      }
+    }
+    this.notify('node');
   }
 
   getAllNodes(): Node[] {
     return [...this.nodes.values()].map(n => structuredClone(n));
   }
 
-  // ==================== Anchor 操作 ====================
+  // ---- Anchor 操作 ----
   addAnchor(anchor: Anchor): Anchor {
     this.anchors.set(anchor.id, structuredClone(anchor));
-    this.notify("anchor");
+    this.notify('anchor');
     return anchor;
   }
 
@@ -77,199 +84,58 @@ export class Store {
     return raw ? structuredClone(raw) : undefined;
   }
 
-  updateAnchor(anchorId: string, patch: Partial<Anchor>) {
+  updateAnchor(anchorId: string, patch: Partial<Anchor>): void {
     const a = this.anchors.get(anchorId);
     if (!a) return;
     Object.assign(a, patch);
-    this.notify("anchor");
+    this.notify('anchor');
   }
 
-  removeAnchor(anchorId: string) {
+  removeAnchor(anchorId: string): void {
     this.anchors.delete(anchorId);
     // 删除关联连线
-    [...this.connections.values()]
-      .filter(c => c.sourceAnchorId === anchorId || c.targetAnchorId === anchorId)
-      .forEach(c => this.connections.delete(c.id));
-    this.notify("anchor");
+    for (const [id, c] of this.connections) {
+      if (c.sourceAnchorId === anchorId || c.targetAnchorId === anchorId) {
+        this.connections.delete(id);
+      }
+    }
+    this.notify('anchor');
   }
-
+  /**
+   * 删除节点的所有锚点（同时删除关联连线）
+   */
+  removeAllAnchors(nodeId: string): void {
+    // 获取该节点的所有锚点
+    const nodeAnchors = this.getNodeAnchors(nodeId);
+    for (const anchor of nodeAnchors) {
+      // removeAnchor 会删除关联连线
+      this.removeAnchor(anchor.id);
+    }
+  }
   getNodeAnchors(nodeId: string): Anchor[] {
-    return [...this.anchors.values()]
-      .filter(a => a.nodeId === nodeId)
-      .map(a => structuredClone(a));
+    return [...this.anchors.values()].filter(a => a.nodeId === nodeId).map(a => structuredClone(a));
   }
 
   getAllAnchors(): Anchor[] {
     return [...this.anchors.values()].map(a => structuredClone(a));
   }
 
-  // 计算锚点坐标（通用）
-  calcAnchorPos(nodeRect: Rect, anchor: Anchor): Point {
-    if (anchor.type === AnchorType.STATIC && anchor.position) {
-      return this.getStaticAnchorPosition(nodeRect, anchor.position, anchor.offset);
-    }
-    if (anchor.type === AnchorType.PERIMETER) {
-      if (anchor.perimeterTotal !== undefined && anchor.perimeterIndex !== undefined) {
-        let pt = getPerimeterAnchor(nodeRect, anchor.perimeterTotal, anchor.perimeterIndex);
-        if (anchor.offset) {
-          pt = { x: pt.x + anchor.offset.x, y: pt.y + anchor.offset.y };
-        }
-        return pt;
-      }
-      return { x: nodeRect.x + nodeRect.width / 2, y: nodeRect.y + nodeRect.height / 2 };
-    }
-    // fallback
-    return { x: nodeRect.x + nodeRect.width / 2, y: nodeRect.y + nodeRect.height / 2 };
-  }
-
-  // 根据节点形状精确计算锚点位置
-  calcAnchorPosForNode(node: Node, anchor: Anchor): Point {
-    const rect = { x: node.x, y: node.y, width: node.width, height: node.height };
-    if (anchor.type === AnchorType.STATIC && anchor.position) {
-      return this.getStaticAnchorPositionWithShape(rect, node.shape, anchor.position, anchor.offset);
-    }
-    if (anchor.type === AnchorType.PERIMETER) {
-      if (anchor.perimeterTotal !== undefined && anchor.perimeterIndex !== undefined) {
-        let pt = getPerimeterAnchor(rect, anchor.perimeterTotal, anchor.perimeterIndex);
-        if (anchor.offset) {
-          pt = { x: pt.x + anchor.offset.x, y: pt.y + anchor.offset.y };
-        }
-        return pt;
-      }
-      return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
-    }
-    return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
-  }
-
-  // 辅助：根据形状计算静态锚点坐标（带偏移）
-  private getStaticAnchorPositionWithShape(
-    rect: Rect,
-    shape: NodeShape | undefined,
-    position: AnchorPosition,
-    offset?: Point
-  ): Point {
-    let pt: Point;
-    if (shape === NodeShape.CIRCLE) {
-      const cx = rect.x + rect.width / 2;
-      const cy = rect.y + rect.height / 2;
-      const r = Math.min(rect.width, rect.height) / 2;
-      const angle = this.getAngleForPosition(position);
-      pt = { x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle) };
-    } else if (shape === NodeShape.ELLIPSE) {
-      const cx = rect.x + rect.width / 2;
-      const cy = rect.y + rect.height / 2;
-      const rx = rect.width / 2;
-      const ry = rect.height / 2;
-      const angle = this.getAngleForPosition(position);
-      pt = { x: cx + rx * Math.cos(angle), y: cy + ry * Math.sin(angle) };
-    } else if (shape === NodeShape.DIAMOND) {
-          // 菱形特殊处理：映射到四个顶点和四条边的中点
-    pt = this.getDiamondAnchorPosition(rect, position);
-    } else {
-      // 矩形/菱形：使用矩形边缘计算
-      pt = this.getStaticAnchorPosition(rect, position);
-    }
-    if (offset) {
-      pt = { x: pt.x + offset.x, y: pt.y + offset.y };
-    }
-    return pt;
-  }
-
-  // 基础静态锚点位置计算（矩形边缘，不含偏移）
-  private getStaticAnchorPosition(rect: Rect, position: AnchorPosition, offset?: Point): Point {
-    const cx = rect.x + rect.width / 2;
-    const cy = rect.y + rect.height / 2;
-    let pt: Point;
-    switch (position) {
-      case AnchorPosition.TOP_LEFT: pt = { x: rect.x, y: rect.y }; break;
-      case AnchorPosition.TOP: pt = { x: cx, y: rect.y }; break;
-      case AnchorPosition.TOP_RIGHT: pt = { x: rect.x + rect.width, y: rect.y }; break;
-      case AnchorPosition.RIGHT: pt = { x: rect.x + rect.width, y: cy }; break;
-      case AnchorPosition.BOTTOM_RIGHT: pt = { x: rect.x + rect.width, y: rect.y + rect.height }; break;
-      case AnchorPosition.BOTTOM: pt = { x: cx, y: rect.y + rect.height }; break;
-      case AnchorPosition.BOTTOM_LEFT: pt = { x: rect.x, y: rect.y + rect.height }; break;
-      case AnchorPosition.LEFT: pt = { x: rect.x, y: cy }; break;
-      default: pt = { x: cx, y: cy };
-    }
-    if (offset) {
-      pt = { x: pt.x + offset.x, y: pt.y + offset.y };
-    }
-    return pt;
-  }
-
-  /**
- * 计算菱形锚点位置
- * 菱形顶点：上(cx, cy-hh), 右(cx+hw, cy), 下(cx, cy+hh), 左(cx-hw, cy)
- * 映射规则：
- *   TOP_LEFT     → 左上边（左-上）的中点
- *   TOP          → 上顶点
- *   TOP_RIGHT    → 右上边（上-右）的中点
- *   RIGHT        → 右顶点
- *   BOTTOM_RIGHT → 右下边（右-下）的中点
- *   BOTTOM       → 下顶点
- *   BOTTOM_LEFT  → 左下边（下-左）的中点
- *   LEFT         → 左顶点
- */
-  private getDiamondAnchorPosition(rect: Rect, position: AnchorPosition): Point {
-    const cx = rect.x + rect.width / 2;
-    const cy = rect.y + rect.height / 2;
-    const hw = rect.width / 2;
-    const hh = rect.height / 2;
-
-    // 四个顶点
-    const top = { x: cx, y: cy - hh };
-    const right = { x: cx + hw, y: cy };
-    const bottom = { x: cx, y: cy + hh };
-    const left = { x: cx - hw, y: cy };
-
-    // 中点函数
-    const mid = (p1: Point, p2: Point): Point => ({
-      x: (p1.x + p2.x) / 2,
-      y: (p1.y + p2.y) / 2,
-    });
-
-    switch (position) {
-      case AnchorPosition.TOP_LEFT:
-        return mid(left, top);     // 左上边中点
-      case AnchorPosition.TOP:
-        return top;                // 上顶点
-      case AnchorPosition.TOP_RIGHT:
-        return mid(top, right);    // 右上边中点
-      case AnchorPosition.RIGHT:
-        return right;              // 右顶点
-      case AnchorPosition.BOTTOM_RIGHT:
-        return mid(right, bottom); // 右下边中点
-      case AnchorPosition.BOTTOM:
-        return bottom;             // 下顶点
-      case AnchorPosition.BOTTOM_LEFT:
-        return mid(bottom, left);  // 左下边中点
-      case AnchorPosition.LEFT:
-        return left;               // 左顶点
-      default:
-        return { x: cx, y: cy };
-    }
-  }
-
-
-  private getAngleForPosition(position: AnchorPosition): number {
-    switch (position) {
-      case AnchorPosition.TOP_LEFT: return -Math.PI * 0.75;
-      case AnchorPosition.TOP: return -Math.PI / 2;
-      case AnchorPosition.TOP_RIGHT: return -Math.PI * 0.25;
-      case AnchorPosition.RIGHT: return 0;
-      case AnchorPosition.BOTTOM_RIGHT: return Math.PI * 0.25;
-      case AnchorPosition.BOTTOM: return Math.PI / 2;
-      case AnchorPosition.BOTTOM_LEFT: return Math.PI * 0.75;
-      case AnchorPosition.LEFT: return Math.PI;
-      default: return 0;
-    }
-  }
-
-  // ==================== Connection 操作 ====================
+  // ---- Connection 操作 ----
   addConnection(conn: Connection): Connection {
-    if (!conn.connectorType) conn.connectorType = ConnectorType.FLOWCHART;
+    // 校验锚点是否存在
+    if (conn.sourceAnchorId && !this.getAnchor(conn.sourceAnchorId)) {
+      console.error(`源锚点 ${conn.sourceAnchorId} 不存在，连线创建失败`);
+      return conn; // 或者抛出错误
+    }
+    if (conn.targetAnchorId && !this.getAnchor(conn.targetAnchorId)) {
+      console.error(`目标锚点 ${conn.targetAnchorId} 不存在，连线创建失败`);
+      return conn;
+    }
+    if (!conn.connectorType) {
+      conn.connectorType = ConnectorType.FLOWCHART;
+    }
     this.connections.set(conn.id, structuredClone(conn));
-    this.notify("connection");
+    this.notify('connection');
     return conn;
   }
 
@@ -278,24 +144,43 @@ export class Store {
     return raw ? structuredClone(raw) : undefined;
   }
 
-  removeConnection(connId: string) {
+  removeConnection(connId: string): void {
     this.connections.delete(connId);
-    this.notify("connection");
+    this.notify('connection');
   }
 
   getAllConnections(): Connection[] {
     return [...this.connections.values()].map(c => structuredClone(c));
   }
 
-  updateConnection(connId: string, patch: Partial<Connection>) {
+  /**
+   * 查找使用指定锚点的连线（双向查找）
+   * @param anchorId 锚点ID
+   * @returns 如果找到则返回连线对象，否则返回 undefined
+   */
+  findConnectionByAnchor(anchorId: string): Connection | undefined {
+    for (const conn of this.connections.values()) {
+      if (conn.sourceAnchorId === anchorId || conn.targetAnchorId === anchorId) {
+        return structuredClone(conn);
+      }
+    }
+    return undefined;
+  }
+
+  updateConnection(connId: string, patch: Partial<Connection>): void {
     const conn = this.connections.get(connId);
     if (!conn) return;
     Object.assign(conn, patch);
-    this.notify("connection");
+    this.notify('connection');
   }
 
-  // ==================== 连线路径计算 ====================
-  computeConnectionPath(conn: Connection): { start: Point; end: Point; pathD: string } | null {
+  // ---- 连线路径计算（委托给 calc 模块） ----
+  computeConnectionPath(conn: Connection): {
+    start: Point;
+    end: Point;
+    pathD: string;
+  } | null {
+    // 模式1：锚点相连
     if (conn.sourceAnchorId && conn.targetAnchorId) {
       const sourceAnchor = this.getAnchor(conn.sourceAnchorId);
       const targetAnchor = this.getAnchor(conn.targetAnchorId);
@@ -304,34 +189,41 @@ export class Store {
       const targetNode = this.getNode(targetAnchor.nodeId);
       if (!sourceNode || !targetNode) return null;
 
-      const start = this.calcAnchorPosForNode(sourceNode, sourceAnchor);
-      const end = this.calcAnchorPosForNode(targetNode, targetAnchor);
-      const pathD = generatePathWithOptions(conn.connectorType, start, end, { stub: 45 });
-      return { start, end, pathD };
+      const start = calcAnchorPosForNode(sourceNode, sourceAnchor);
+      const end = calcAnchorPosForNode(targetNode, targetAnchor);
+      const result = computePath(start, end, conn.connectorType, {
+        stub: conn.stub ?? Defaults.connection.stub, // 默认 5
+        gap: conn.gap ?? Defaults.connection.gap, // 默认 0
+      });
+      return { start, end, pathD: result.pathD }; // ✅ 提取 pathD
     }
 
+    // 模式2：节点直连（连续锚点）
     if (conn.sourceNodeId && conn.targetNodeId) {
       const sourceNode = this.getNode(conn.sourceNodeId);
       const targetNode = this.getNode(conn.targetNodeId);
       if (!sourceNode || !targetNode) return null;
       const { source, target } = getContinuousAnchorPair(sourceNode, targetNode);
-
-        // 🔍 调试输出
-  console.log('=== 连续锚点调试 ===');
-  console.log('源节点:', sourceNode.id, '矩形:', { x: sourceNode.x, y: sourceNode.y, w: sourceNode.width, h: sourceNode.height });
-  console.log('目标节点:', targetNode.id, '矩形:', { x: targetNode.x, y: targetNode.y, w: targetNode.width, h: targetNode.height });
-  console.log('计算出的源端点:', source);
-  console.log('计算出的目标端点:', target);
-  console.log('目标端点是否在节点边缘? 预期应在 (', targetNode.x, '~', targetNode.x + targetNode.width, ', ', targetNode.y, '~', targetNode.y + targetNode.height, ') 的边上');
-      
-      const pathD = generatePath(conn.connectorType, source, target);
-      return { start: source, end: target, pathD };
+      const result = computePath(source, target, conn.connectorType);
+      return { start: source, end: target, pathD: result.pathD }; // ✅ 提取 pathD
     }
     return null;
   }
 
-  // ==================== 导入/导出 ====================
-  exportData() {
+  // ---- 锚点位置计算（委托给 calc 模块） ----
+  calcAnchorPosForNode(node: Node, anchor: Anchor): Point {
+    return calcAnchorPosForNode(node, anchor);
+  }
+
+  // ---- 删除选中 ----
+  deleteSelected(type: SelectableType, id: string): void {
+    if (type === 'node') this.removeNode(id);
+    else if (type === 'anchor') this.removeAnchor(id);
+    else if (type === 'connection') this.removeConnection(id);
+  }
+
+  // ---- 导入 / 导出 ----
+  exportData(): StoreData {
     return {
       nodes: this.getAllNodes(),
       anchors: this.getAllAnchors(),
@@ -339,68 +231,51 @@ export class Store {
     };
   }
 
-  importData(data: ReturnType<typeof this.exportData>) {
+  importData(data: StoreData): void {
     this.nodes.clear();
     this.anchors.clear();
     this.connections.clear();
     data.nodes.forEach(n => this.addNode(n));
     data.anchors.forEach(a => this.addAnchor(a));
     data.connections.forEach(c => this.addConnection(c));
-    this.notify("node");
+    this.notify('node');
   }
 
-  deleteSelected(type: SelectableType, id: string) {
-    if (type === "node") this.removeNode(id);
-    else if (type === "anchor") this.removeAnchor(id);
-    else if (type === "connection") this.removeConnection(id);
+  /**
+   * 更新连线的源锚点（用于重连）
+   * @returns 是否更新成功（如果目标相同或重复则返回 false）
+   */
+  updateConnectionSource(connId: string, newSourceAnchorId: string): boolean {
+    const conn = this.connections.get(connId);
+    if (!conn) return false;
+    if (conn.sourceAnchorId === newSourceAnchorId) return false;
+    const exist = this.getAllConnections().some(
+      c => c.id !== connId && c.sourceAnchorId === newSourceAnchorId && c.targetAnchorId === conn.targetAnchorId
+    );
+    if (exist) return false;
+    conn.sourceAnchorId = newSourceAnchorId;
+    this.notify('connection');
+    return true;
   }
 
-  // 创建节点并自动生成8个静态锚点（TopLeft, Top, TopRight, Right, BottomRight, Bottom, BottomLeft, Left）
-  addNodeWithAnchors(nodeData: Omit<Node, "id">): Node {
-    const nodeId = uuidv4();
-    const node: Node = {
-      ...nodeData,
-      id: nodeId,
-      shape: nodeData.shape || NodeShape.RECTANGLE,
-      fill: nodeData.fill || "#ffffff",
-      stroke: nodeData.stroke || "#5588dd",
-      strokeWidth: nodeData.strokeWidth || 2,
-    };
-    this.addNode(node);
-
-    const positions: AnchorPosition[] = [
-      AnchorPosition.TOP_LEFT,
-      AnchorPosition.TOP,
-      AnchorPosition.TOP_RIGHT,
-      AnchorPosition.RIGHT,
-      AnchorPosition.BOTTOM_RIGHT,
-      AnchorPosition.BOTTOM,
-      AnchorPosition.BOTTOM_LEFT,
-      AnchorPosition.LEFT,
-    ];
-    // 方向分布：上排 output，右排 output，下排 input，左排 input
-    const directions: ('input' | 'output')[] = [
-      'output', 'output', 'output',
-      'output',
-      'input', 'input', 'input',
-      'input'
-    ];
-    positions.forEach((pos, idx) => {
-      const anchor: Anchor = {
-        id: uuidv4(),
-        nodeId,
-        type: AnchorType.STATIC,
-        position: pos,
-        direction: directions[idx % directions.length],
-        radius: 7,
-        fill: "#4285f4",
-        stroke: "#ffffff",
-        offset: { x: 0, y: 0 },
-      };
-      this.addAnchor(anchor);
-    });
-
-    this.notify("node");
-    return node;
+  /**
+   * 更新连线的目标锚点（用于重连）
+   * @returns 是否更新成功（如果目标相同或重复则返回 false）
+   */
+  updateConnectionTarget(connId: string, newTargetAnchorId: string): boolean {
+    const conn = this.connections.get(connId);
+    if (!conn) return false;
+    if (conn.targetAnchorId === newTargetAnchorId) return false;
+    const exist = this.getAllConnections().some(
+      c => c.id !== connId && c.sourceAnchorId === conn.sourceAnchorId && c.targetAnchorId === newTargetAnchorId
+    );
+    if (exist) return false;
+    conn.targetAnchorId = newTargetAnchorId;
+    this.notify('connection');
+    return true;
   }
 }
+
+// 导入 calc 模块的函数（放在文件底部避免循环依赖）
+import { calcAnchorPosForNode } from '../../calc/anchor/position';
+import { computePath } from '../../calc/connector/path';
