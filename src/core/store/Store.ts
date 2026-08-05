@@ -274,6 +274,19 @@ export class Store {
     this.notify('connection');
     return true;
   }
+
+  /**
+   * 检查锚点是否已达到最大连线数量
+   */
+  isAnchorFull(anchorId: string): boolean {
+    const max = Defaults.connection.maxConnections;
+    // 如果 max <= 0，视为无限制
+    if (max <= 0) return false;
+    const count = Array.from(this.connections.values()).filter(
+      c => c.sourceAnchorId === anchorId || c.targetAnchorId === anchorId
+    ).length;
+    return count >= max;
+  }
 }
 
 // 导入 calc 模块的函数（放在文件底部避免循环依赖）

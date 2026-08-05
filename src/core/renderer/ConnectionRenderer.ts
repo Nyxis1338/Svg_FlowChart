@@ -64,11 +64,7 @@ export class ConnectionRenderer {
         if (arrowEl) g.appendChild(arrowEl);
       }
 
-      g.addEventListener('mousedown', e => {
-        e.stopPropagation();
-        this.selection.select('connection', conn.id);
-      });
-
+      // ✅ 事件绑定已移除，由 EventBus 统一处理
       this.connectionLayer.appendChild(g);
     }
   }

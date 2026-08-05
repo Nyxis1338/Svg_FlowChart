@@ -19,19 +19,17 @@ function getAnchor(store: any, nodeId: string, position: AnchorPosition, directi
 
 function addDefaultAnchors(chart: SvgEngine, nodeId: string): void {
   const store = chart.store;
-  // 清除旧锚点
   const oldAnchors = store.getNodeAnchors(nodeId);
   for (const a of oldAnchors) {
     store.removeAnchor(a.id);
   }
 
-  // 上、右为 output（蓝色）
   chart.addAnchor({
     nodeId,
     type: AnchorType.STATIC,
     position: AnchorPosition.TOP,
     direction: 'output',
-    radius: 6,
+    radius: 5,
     fill: '#ffffff',
     stroke: '#5470c6',
   });
@@ -40,18 +38,17 @@ function addDefaultAnchors(chart: SvgEngine, nodeId: string): void {
     type: AnchorType.STATIC,
     position: AnchorPosition.RIGHT,
     direction: 'output',
-    radius: 6,
+    radius: 5,
     fill: '#ffffff',
     stroke: '#5470c6',
   });
 
-  // 下、左为 input（绿色）
   chart.addAnchor({
     nodeId,
     type: AnchorType.STATIC,
     position: AnchorPosition.BOTTOM,
     direction: 'input',
-    radius: 6,
+    radius: 5,
     fill: '#e8f5e9',
     stroke: '#43a047',
   });
@@ -60,12 +57,10 @@ function addDefaultAnchors(chart: SvgEngine, nodeId: string): void {
     type: AnchorType.STATIC,
     position: AnchorPosition.LEFT,
     direction: 'input',
-    radius: 6,
+    radius: 5,
     fill: '#e8f5e9',
     stroke: '#43a047',
   });
-
-  // 可选：添加 both 锚点（这里暂不添加，保持示例简单）
 }
 
 function safeAddConnection(store: any, sourceAnchor: any, targetAnchor: any, props: any) {
@@ -136,7 +131,6 @@ addDefaultAnchors(chart, nodeD.id);
 
 // ==================== 创建连线 ====================
 
-// 1. A右 output → B左 input（流程图折线）
 const aRightOut = getAnchor(store, nodeA.id, AnchorPosition.RIGHT, 'output');
 const bLeftIn = getAnchor(store, nodeB.id, AnchorPosition.LEFT, 'input');
 safeAddConnection(store, aRightOut, bLeftIn, {
@@ -147,10 +141,9 @@ safeAddConnection(store, aRightOut, bLeftIn, {
   arrow: { direction: ArrowDirection.TARGET, length: 12 },
 });
 
-// 2. A上 output → C下 input（直线）
 const aTopOut = getAnchor(store, nodeA.id, AnchorPosition.TOP, 'output');
-const cBottomIn = getAnchor(store, nodeC.id, AnchorPosition.BOTTOM, 'input');
-safeAddConnection(store, aTopOut, cBottomIn, {
+const cLeftIn = getAnchor(store, nodeC.id, AnchorPosition.LEFT, 'input');
+safeAddConnection(store, aTopOut, cLeftIn, {
   connectorType: ConnectorType.STRAIGHT,
   stroke: randomColor(),
   strokeWidth: 2,
@@ -158,7 +151,6 @@ safeAddConnection(store, aTopOut, cBottomIn, {
   arrow: { direction: ArrowDirection.TARGET, length: 12 },
 });
 
-// 3. B右 output → D左 input（贝塞尔曲线）
 const bRightOut = getAnchor(store, nodeB.id, AnchorPosition.RIGHT, 'output');
 const dLeftIn = getAnchor(store, nodeD.id, AnchorPosition.LEFT, 'input');
 safeAddConnection(store, bRightOut, dLeftIn, {
@@ -169,13 +161,41 @@ safeAddConnection(store, bRightOut, dLeftIn, {
   arrow: { direction: ArrowDirection.BOTH, length: 12 },
 });
 
-// 4. D上 output → C左 input（流程图折线）
 const dTopOut = getAnchor(store, nodeD.id, AnchorPosition.TOP, 'output');
-const cLeftIn = getAnchor(store, nodeC.id, AnchorPosition.LEFT, 'input');
-safeAddConnection(store, dTopOut, cLeftIn, {
+const cbottomIn = getAnchor(store, nodeC.id, AnchorPosition.BOTTOM, 'input');
+safeAddConnection(store, dTopOut, cbottomIn, {
   connectorType: ConnectorType.FLOWCHART,
   stroke: randomColor(),
   strokeWidth: 2,
+});
+
+// ==================== 锚点点击监听（调试用） ====================
+chart.svgRoot.addEventListener('click', e => {
+  const target = e.target as SVGElement;
+  if (target.tagName === 'circle' && target.hasAttribute('data-anchor-id')) {
+    const anchorId = target.getAttribute('data-anchor-id')!;
+    const anchor = store.getAnchor(anchorId);
+    if (anchor) {
+      const node = store.getNode(anchor.nodeId);
+      console.log('🔍 点击锚点:', {
+        id: anchor.id,
+        nodeId: anchor.nodeId,
+        nodeLabel: node?.label || '未知',
+        position: anchor.position,
+        direction: anchor.direction,
+        type: anchor.type,
+        radius: anchor.radius,
+        fill: anchor.fill,
+        stroke: anchor.stroke,
+        connections: store
+          .getAllConnections()
+          .filter(c => c.sourceAnchorId === anchor.id || c.targetAnchorId === anchor.id)
+          .map(c => c.id),
+      });
+    } else {
+      console.warn('⚠️ 未找到锚点:', anchorId);
+    }
+  }
 });
 
 // ==================== 调试日志 ====================
@@ -203,6 +223,7 @@ console.log('  从锚点拖拽：创建连线 / 重连已有连线');
 console.log('  Delete/Backspace：删除选中元素');
 console.log('  ESC：取消拖拽');
 console.log('📦 全局对象 chart, nodeA, nodeB, nodeC, nodeD 已挂载，可调试');
+console.log('💡 点击任意锚点，控制台将输出其详细信息');
 
 // ==================== UI 按钮 ====================
 

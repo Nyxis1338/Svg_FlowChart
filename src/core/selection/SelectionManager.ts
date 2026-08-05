@@ -1,4 +1,4 @@
-type SelectableType = "node" | "anchor" | "connection" | null;  // 改为 "anchor"
+type SelectableType = 'node' | 'anchor' | 'connection' | null;
 
 export class SelectionManager {
   private selectedType: SelectableType = null;

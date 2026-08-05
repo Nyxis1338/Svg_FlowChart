@@ -60,11 +60,7 @@ export class NodeRenderer {
         g.appendChild(text);
       }
 
-      shapeEl.addEventListener('mousedown', e => {
-        e.stopPropagation();
-        this.selection.select('node', node.id);
-      });
-
+      // ✅ 事件绑定已移除，由 EventBus 统一处理
       this.nodeLayer.appendChild(g);
     }
   }

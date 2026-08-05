@@ -7,8 +7,9 @@ import type { SvgRenderer } from '../renderer/SvgRenderer';
 import type { SelectionManager } from '../selection/SelectionManager';
 import type { Anchor, Node, Connection } from '../../types/SvgModel';
 import type { Point } from '../../types/geometry';
-import { ConnectorType, AnchorPosition } from '../../types/SvgModel'; // ✅ 导入 AnchorPosition
+import { ConnectorType, AnchorPosition } from '../../types/SvgModel';
 import { Defaults } from '../../styles/defaults';
+import { HitTest } from './HitTest';
 
 /** 拖拽状态枚举 */
 enum DragState {
@@ -25,7 +26,6 @@ export class DragManager {
 
   private nodeDragData: { nodeId: string; offset: Point } | null = null;
 
-  // ✅ 在类型定义中增加 orientation 字段
   private linkDragData: {
     sourceAnchorId: string;
     startX: number;
@@ -41,7 +41,7 @@ export class DragManager {
     strokeWidth?: number;
     connectorType?: ConnectorType;
     fixedAnchorId?: string;
-    orientation?: { dx: number; dy: number }; // ✅ 新增
+    orientation?: { dx: number; dy: number };
   } | null = null;
 
   private highlightedAnchor: Anchor | null = null;
@@ -49,9 +49,19 @@ export class DragManager {
   private rafId: number | null = null;
   private lastMoveEvent: MouseEvent | null = null;
 
+  private hitTest = new HitTest();
+
   constructor(chart: SvgEngine) {
     this.chart = chart;
     this.bindEvents();
+  }
+
+  /**
+   * 由 EventBus 调用，处理节点拖拽
+   */
+  public startNodeDrag(evt: MouseEvent): void {
+    // 直接调用 onMouseDown，因为它已经实现了节点检测逻辑
+    this.onMouseDown(evt);
   }
 
   private get store() {
@@ -68,8 +78,8 @@ export class DragManager {
   }
 
   private bindEvents() {
-    const svg = this.chart.getSvgRoot();
-    svg.addEventListener('mousedown', this.onMouseDown.bind(this));
+    // ✅ 只监听全局的 mousemove, mouseup, keydown, blur
+    // mousedown 由 EventBus 分发，这里不再监听
     window.addEventListener('mousemove', this.onMouseMove.bind(this), { passive: true });
     window.addEventListener('mouseup', this.onMouseUp.bind(this));
     window.addEventListener('keydown', this.onKeyDown.bind(this));
@@ -78,12 +88,15 @@ export class DragManager {
 
   // ==================== 鼠标事件 ====================
 
+  /**
+   * 由 EventBus 调用，处理节点拖拽的启动
+   */
   private onMouseDown(evt: MouseEvent) {
     if (this.state !== DragState.IDLE) return;
 
     const target = evt.target as SVGElement;
     if (target.tagName === 'circle' && target.hasAttribute('data-anchor-id')) {
-      return;
+      return; // 锚点由 startLinkDrag 处理
     }
 
     let nodeId: string | undefined;
@@ -112,7 +125,6 @@ export class DragManager {
   // ==================== 锚点法线方向辅助 ====================
 
   private getAnchorOrientation(anchor: Anchor): { dx: number; dy: number } {
-    // 根据 position 返回法线方向
     switch (anchor.position) {
       case AnchorPosition.TOP:
       case AnchorPosition.TOP_LEFT:
@@ -140,83 +152,94 @@ export class DragManager {
       return;
     }
 
-    // 允许 output 和 both 作为源端，input 仅当重连时允许
     const isOutput = anchor.direction === 'output' || anchor.direction === 'both';
     const existingConnection = this.store.findConnectionByAnchor(anchor.id);
     const isReconnect = !!existingConnection;
 
     if (!isOutput && !isReconnect) {
-      // input 锚点且没有已有连线，不允许拖拽
       return;
     }
 
     const node = this.store.getNode(anchor.nodeId);
     if (!node) return;
     const anchorPos = this.store.calcAnchorPosForNode(node, anchor);
-    const orientation = this.getAnchorOrientation(anchor);
 
     if (isReconnect) {
       const conn = existingConnection!;
       if (conn.detachable === false || conn.reattach === false) {
         return;
       }
-      const isSource = conn.sourceAnchorId === anchor.id;
-      const isTarget = conn.targetAnchorId === anchor.id;
-      if (!isSource && !isTarget) return;
-
-      const endpoint: 'source' | 'target' = isSource ? 'source' : 'target';
-      let fixedAnchorId: string;
-      if (endpoint === 'target') {
-        fixedAnchorId = conn.sourceAnchorId!;
-      } else {
-        fixedAnchorId = conn.targetAnchorId!;
-      }
-      const fixedAnchor = this.store.getAnchor(fixedAnchorId);
-      if (!fixedAnchor) return;
-      const fixedNode = this.store.getNode(fixedAnchor.nodeId);
-      if (!fixedNode) return;
-      const fixedPos = this.store.calcAnchorPosForNode(fixedNode, fixedAnchor);
-
-      // 使用固定端锚点的 orientation
-      const orientation = this.getAnchorOrientation(fixedAnchor);
-
-      const stroke = conn.stroke || Defaults.connection.stroke;
-      const strokeWidth = conn.strokeWidth || Defaults.connection.strokeWidth;
-      const connectorType = conn.connectorType;
-
-      this.linkDragData = {
-        sourceAnchorId: anchor.id,
-        startX: fixedPos.x,
-        startY: fixedPos.y,
-        endX: anchorPos.x,
-        endY: anchorPos.y,
-        type: 'reconnect',
-        connectionId: conn.id,
-        oldSourceAnchorId: conn.sourceAnchorId,
-        oldTargetAnchorId: conn.targetAnchorId,
-        endpoint,
-        stroke,
-        strokeWidth,
-        connectorType,
-        fixedAnchorId,
-        orientation, // ✅ 存储法线方向
-      };
-
-      this.renderer.setReconnecting(conn.id, true);
-      this.renderer.highlightAnchor(anchor.id, true);
+      this.handleReconnect(anchor, conn, anchorPos, evt);
     } else {
-      // 新建连线（只有 output/both 能进入）
-      this.linkDragData = {
-        sourceAnchorId: anchor.id,
-        startX: anchorPos.x,
-        startY: anchorPos.y,
-        endX: anchorPos.x,
-        endY: anchorPos.y,
-        type: 'create',
-        endpoint: 'source',
-        orientation, // ✅ 存储法线方向
-      };
+      this.handleCreate(anchor, anchorPos, evt);
     }
+  }
+
+  private handleCreate(anchor: Anchor, anchorPos: Point, evt: MouseEvent): void {
+    const orientation = this.getAnchorOrientation(anchor);
+
+    this.linkDragData = {
+      sourceAnchorId: anchor.id,
+      startX: anchorPos.x,
+      startY: anchorPos.y,
+      endX: anchorPos.x,
+      endY: anchorPos.y,
+      type: 'create',
+      endpoint: 'source',
+      orientation,
+      connectorType: ConnectorType.FLOWCHART,
+    };
+
+    this.state = DragState.LINK_DRAGGING;
+    evt.preventDefault();
+    this.chart.getSvgRoot().style.cursor = 'grabbing';
+    this.clearHighlight();
+  }
+
+  private handleReconnect(anchor: Anchor, conn: Connection, anchorPos: Point, evt: MouseEvent): void {
+    const isSource = conn.sourceAnchorId === anchor.id;
+    const isTarget = conn.targetAnchorId === anchor.id;
+    if (!isSource && !isTarget) return;
+
+    const endpoint: 'source' | 'target' = isSource ? 'source' : 'target';
+
+    let fixedAnchorId: string;
+    if (endpoint === 'target') {
+      fixedAnchorId = conn.sourceAnchorId!;
+    } else {
+      fixedAnchorId = conn.targetAnchorId!;
+    }
+    const fixedAnchor = this.store.getAnchor(fixedAnchorId);
+    if (!fixedAnchor) return;
+    const fixedNode = this.store.getNode(fixedAnchor.nodeId);
+    if (!fixedNode) return;
+    const fixedPos = this.store.calcAnchorPosForNode(fixedNode, fixedAnchor);
+
+    const orientation = this.getAnchorOrientation(fixedAnchor);
+    const stroke = conn.stroke || Defaults.connection.stroke;
+    const strokeWidth = conn.strokeWidth || Defaults.connection.strokeWidth;
+    const connectorType = conn.connectorType;
+
+    this.linkDragData = {
+      sourceAnchorId: anchor.id,
+      startX: fixedPos.x,
+      startY: fixedPos.y,
+      endX: anchorPos.x,
+      endY: anchorPos.y,
+      type: 'reconnect',
+      connectionId: conn.id,
+      oldSourceAnchorId: conn.sourceAnchorId,
+      oldTargetAnchorId: conn.targetAnchorId,
+      endpoint,
+      stroke,
+      strokeWidth,
+      connectorType,
+      fixedAnchorId,
+      orientation,
+    };
+
+    this.renderer.setReconnecting(conn.id, true);
+    this.renderer.highlightAnchor(anchor.id, true);
 
     this.state = DragState.LINK_DRAGGING;
     evt.preventDefault();
@@ -257,7 +280,7 @@ export class DragManager {
       const stroke = this.linkDragData.stroke;
       const strokeWidth = this.linkDragData.strokeWidth;
       const connectorType = this.linkDragData.connectorType || ConnectorType.FLOWCHART;
-      const orientation = this.linkDragData.orientation; // ✅ 取出方向
+      const orientation = this.linkDragData.orientation;
 
       this.renderer.setTempLine(
         {
@@ -270,15 +293,18 @@ export class DragManager {
         isReconnect,
         stroke,
         strokeWidth,
-        orientation // ✅ 传递方向
+        orientation
       );
-      console.log('起点:', this.linkDragData.startX, this.linkDragData.startY);
-      console.log('终点:', canvasPos.x, canvasPos.y);
 
-      const hitAnchor = this.queryAnchorUnderMouse(evt);
+      const hitAnchor = this.hitTest.findNearestAnchor(canvasPos, this.store, this.linkDragData.sourceAnchorId);
+
       const sourceAnchor = this.store.getAnchor(this.linkDragData.sourceAnchorId);
       const sourceNode = sourceAnchor ? this.store.getNode(sourceAnchor.nodeId) : null;
-      const isValidTarget = hitAnchor && sourceNode && this.store.getNode(hitAnchor.nodeId)?.id !== sourceNode.id;
+      const isValidTarget =
+        hitAnchor &&
+        sourceNode &&
+        this.store.getNode(hitAnchor.nodeId)?.id !== sourceNode.id &&
+        this.isDirectionCompatible(this.linkDragData.endpoint, hitAnchor);
 
       if (isValidTarget && hitAnchor !== this.highlightedAnchor) {
         this.clearHighlight();
@@ -310,7 +336,9 @@ export class DragManager {
     }
 
     if ((this.state === DragState.LINK_DRAGGING || this.state === DragState.HOVERING) && this.linkDragData) {
-      const hitAnchor = this.queryAnchorUnderMouse(evt);
+      const canvasPos = this.viewport.screenToCanvas({ x: evt.clientX, y: evt.clientY });
+      const hitAnchor = this.hitTest.findNearestAnchor(canvasPos, this.store, this.linkDragData.sourceAnchorId);
+
       const sourceAnchor = this.store.getAnchor(this.linkDragData.sourceAnchorId);
       const isReconnect = this.linkDragData.type === 'reconnect';
       let success = false;
@@ -319,7 +347,13 @@ export class DragManager {
         const sourceNode = this.store.getNode(sourceAnchor.nodeId);
         const targetNode = this.store.getNode(hitAnchor.nodeId);
         if (sourceNode && targetNode && sourceNode.id !== targetNode.id) {
-          if (isReconnect) {
+          const isSource = this.linkDragData.endpoint === 'source';
+          const targetDirection = hitAnchor.direction;
+          const isValidDirection = this.isDirectionCompatible(this.linkDragData.endpoint, hitAnchor);
+
+          if (!isValidDirection) {
+            console.warn('方向不匹配，无法连接');
+          } else if (isReconnect) {
             const connId = this.linkDragData.connectionId;
             if (connId) {
               const conn = this.store.getConnection(connId);
@@ -430,36 +464,18 @@ export class DragManager {
       this.highlightedAnchor = null;
     }
   }
+  // 在 processMove 中，将 isValidTarget 改为同时检查方向
+  // 添加一个辅助方法 isDirectionCompatible
 
-  private queryAnchorUnderMouse(evt: MouseEvent): Anchor | undefined {
-    const canvasPoint = this.viewport.screenToCanvas({ x: evt.clientX, y: evt.clientY });
-    const allAnchors = this.store.getAllAnchors();
-    const hitRadius = 22;
-    let closest: Anchor | undefined;
-    let minDist = hitRadius;
-
-    const isReconnect = this.linkDragData?.type === 'reconnect';
-    const sourceAnchorId = this.linkDragData?.sourceAnchorId;
-
-    for (const ap of allAnchors) {
-      // ✅ 仅排除自身锚点（不能连到自己）
-      if (ap.id === sourceAnchorId) continue;
-
-      const node = this.store.getNode(ap.nodeId);
-      if (!node) continue;
-      const pos = this.store.calcAnchorPosForNode(node, ap);
-      const dist = Math.hypot(canvasPoint.x - pos.x, canvasPoint.y - pos.y);
-      if (dist < minDist) {
-        minDist = dist;
-        closest = ap;
-      }
+  private isDirectionCompatible(endpoint: 'source' | 'target', targetAnchor: Anchor): boolean {
+    if (endpoint === 'source') {
+      return targetAnchor.direction === 'output' || targetAnchor.direction === 'both';
+    } else {
+      return targetAnchor.direction === 'input' || targetAnchor.direction === 'both';
     }
-    return closest;
   }
 
   destroy() {
-    const svg = this.chart.getSvgRoot();
-    svg.removeEventListener('mousedown', this.onMouseDown.bind(this));
     window.removeEventListener('mousemove', this.onMouseMove.bind(this));
     window.removeEventListener('mouseup', this.onMouseUp.bind(this));
     window.removeEventListener('keydown', this.onKeyDown.bind(this));

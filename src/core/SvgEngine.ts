@@ -8,6 +8,8 @@ import { SvgRenderer } from './renderer/SvgRenderer';
 import type { Node, Connection, Anchor } from '../types/SvgModel';
 import type { Point } from '../types/geometry';
 import { uuidv4 } from '../utils/uuid';
+import { EventBus } from './interaction/EventBus';
+import { ContextMenu } from './interaction/ContextMenu'; // ✅ 新增导入
 
 export class SvgEngine {
   public readonly svgRoot: SVGSVGElement;
@@ -16,6 +18,8 @@ export class SvgEngine {
   public readonly selection: SelectionManager;
   public readonly dragManager: DragManager;
   public readonly renderer: SvgRenderer;
+  public readonly eventBus: EventBus; // 新增
+  public readonly contextMenu: ContextMenu; // ✅ 新增
 
   constructor(container: HTMLElement) {
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg') as SVGSVGElement;
@@ -29,6 +33,8 @@ export class SvgEngine {
 
     this.dragManager = new DragManager(this);
     this.renderer = new SvgRenderer(this);
+    this.contextMenu = new ContextMenu(this, this.store, this.selection, this.viewport); // ✅ 实例化
+    this.eventBus = new EventBus(this); // ✅ EventBus 需要访问 contextMenu，因此放在后面
   }
 
   private addDefs(svg: SVGSVGElement): void {
@@ -220,6 +226,7 @@ export class SvgEngine {
     this.dragManager.destroy();
     this.renderer.destroy();
     this.viewport.destroy();
+    this.contextMenu.destroy(); // ✅ 新增
     this.svgRoot.remove();
   }
 }

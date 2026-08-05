@@ -45,6 +45,7 @@ export const Defaults = {
     strokeLinejoin: 'round',
     stub: 5, // 默认 stub 长度
     gap: 0, // 默认 gap 长度
+    maxConnections: 4, // 默认每个锚点最多 4 条连线（-1 表示无限制）
   },
 
   /** 箭头默认样式 */

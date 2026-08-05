@@ -3,27 +3,25 @@
 import { createSvgElement } from '../../utils/dom';
 
 export class LayerManager {
+  public readonly rootGroup: SVGGElement;
   public readonly bgLayer: SVGGElement;
   public readonly connectionLayer: SVGGElement;
   public readonly nodeLayer: SVGGElement;
   public readonly anchorLayer: SVGGElement;
 
-  constructor(parent: SVGGElement) {
+  constructor(parent: SVGSVGElement) {
+    this.rootGroup = createSvgElement('g') as SVGGElement;
     this.bgLayer = createSvgElement('g') as SVGGElement;
     this.connectionLayer = createSvgElement('g') as SVGGElement;
     this.nodeLayer = createSvgElement('g') as SVGGElement;
     this.anchorLayer = createSvgElement('g') as SVGGElement;
 
-    // 图层顺序：bgLayer (网格背景) -> nodeLayer -> connectionLayer -> anchorLayer
-    // 注意：ViewportManager 已经添加了 gridLayer，它会通过 prepend 放在最前，
-    // 所以这里 append 的图层会在 gridLayer 之上。
-    parent.append(this.bgLayer, this.nodeLayer, this.connectionLayer, this.anchorLayer);
+    // ✅ 图层顺序：节点 → 连线 → 锚点（后添加的在上层）
+    this.rootGroup.append(this.bgLayer, this.nodeLayer, this.connectionLayer, this.anchorLayer);
+    parent.appendChild(this.rootGroup);
   }
 
   destroy(): void {
-    this.bgLayer.remove();
-    this.nodeLayer.remove();
-    this.connectionLayer.remove();
-    this.anchorLayer.remove();
+    this.rootGroup.remove();
   }
 }

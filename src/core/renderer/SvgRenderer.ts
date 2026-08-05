@@ -124,6 +124,7 @@ export class SvgRenderer {
     this.tempLineEl!.setAttribute('d', pathD);
     this.tempDotEl!.setAttribute('cx', String(pos.x2));
     this.tempDotEl!.setAttribute('cy', String(pos.y2));
+    console.log('pathD:', pathD);
   }
 
   clearTempLine(): void {

@@ -23,7 +23,7 @@ export class AnchorRenderer {
       if (!node) continue;
 
       if (ap.type === AnchorType.CONTINUOUS) {
-        continue; // 连续锚点不渲染可见元素
+        continue;
       }
 
       const pos = this.store.calcAnchorPosForNode(node, ap);
@@ -37,7 +37,6 @@ export class AnchorRenderer {
       circle.style.transition = 'all 0.15s ease-out';
       circle.dataset['anchorId'] = ap.id;
 
-      // 根据 direction 设置不同颜色
       if (ap.direction === 'output') {
         circle.setAttribute('fill', ap.fill ?? '#ffffff');
         circle.setAttribute('stroke', ap.stroke ?? '#5470c6');
@@ -53,11 +52,7 @@ export class AnchorRenderer {
         circle.setAttribute('stroke-width', '2');
       }
 
-      circle.addEventListener('mousedown', e => {
-        e.stopPropagation();
-        this.dragManager.startLinkDrag(ap, e);
-      });
-
+      // ✅ 事件绑定已移除，由 EventBus 统一处理
       this.anchorLayer.appendChild(circle);
     }
   }
@@ -78,7 +73,6 @@ export class AnchorRenderer {
           const ap = this.store.getAnchor(anchorId);
           const baseRadius = ap?.radius ?? Defaults.anchor.radius;
           circle.setAttribute('r', String(baseRadius));
-          // 恢复时根据方向恢复颜色
           if (ap?.direction === 'output') {
             circle.setAttribute('stroke', ap?.stroke ?? '#5470c6');
             circle.setAttribute('fill', ap?.fill ?? '#ffffff');
@@ -86,7 +80,6 @@ export class AnchorRenderer {
             circle.setAttribute('stroke', ap?.stroke ?? '#43a047');
             circle.setAttribute('fill', ap?.fill ?? '#e8f5e9');
           } else {
-            // both
             circle.setAttribute('stroke', ap?.stroke ?? '#9c27b0');
             circle.setAttribute('fill', ap?.fill ?? '#ffffff');
           }
