@@ -33,10 +33,12 @@ export const Defaults = {
     hoverStrokeWidth: 3,
     hoverRadiusMultiplier: 1.6,
     hoverShadow: 'drop-shadow(0 0 8px rgba(255,107,107,0.5))',
+    direction: 'both', // 'input' | 'output' | 'both'
   },
 
   /** 连线默认样式 */
   connection: {
+    connectorType: 'flowchart', // 'flowchart' | 'bezier' | 'straight'
     stroke: '#5b6c7d',
     strokeWidth: 2,
     selectedStroke: '#ff6622',

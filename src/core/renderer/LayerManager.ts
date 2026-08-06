@@ -9,7 +9,7 @@ export class LayerManager {
   public readonly nodeLayer: SVGGElement;
   public readonly anchorLayer: SVGGElement;
 
-  constructor(parent: SVGSVGElement) {
+  constructor(parent: SVGGElement) {
     this.rootGroup = createSvgElement('g') as SVGGElement;
     this.bgLayer = createSvgElement('g') as SVGGElement;
     this.connectionLayer = createSvgElement('g') as SVGGElement;

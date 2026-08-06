@@ -132,7 +132,10 @@ export class Store {
       return conn;
     }
     if (!conn.connectorType) {
-      conn.connectorType = ConnectorType.FLOWCHART;
+      // 从 defaults 取字符串，然后转为枚举
+      const defaultType = Defaults.connection.connectorType;
+      // 假设 defaultType 是 'straight' | 'bezier' | 'flowchart' 之一
+      conn.connectorType = defaultType as ConnectorType;
     }
     this.connections.set(conn.id, structuredClone(conn));
     this.notify('connection');
