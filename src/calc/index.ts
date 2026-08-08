@@ -1,3 +1,5 @@
+// src/calc/index.ts
+
 /**
  * calc 计算模块
  * 提供锚点计算（anchor）和连线路径生成（connector）的核心算法

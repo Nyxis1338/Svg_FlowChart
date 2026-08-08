@@ -4,8 +4,8 @@ import type { Point, Rect } from '../../types/geometry';
 import type { Anchor, Node, Connection } from '../../types/SvgModel';
 import { NodeShape, AnchorType, ConnectorType, AnchorPosition } from '../../types/SvgModel';
 import { getContinuousAnchorPair } from '../../calc';
-import { uuidv4 } from '../../utils/uuid';
 import { Defaults } from '../../styles/defaults';
+import { getAnchorOrientation } from '../../utils/anchor-helpers';
 
 // ==================== 类型定义 ====================
 type StoreChangeType = 'node' | 'anchor' | 'connection';
@@ -84,10 +84,10 @@ export class Store {
     return raw ? structuredClone(raw) : undefined;
   }
 
-  updateAnchor(anchorId: string, patch: Partial<Anchor>): void {
-    const a = this.anchors.get(anchorId);
-    if (!a) return;
-    Object.assign(a, patch);
+  updateAnchor(anchorId: string, updates: Partial<Anchor>): void {
+    const anchor = this.anchors.get(anchorId);
+    if (!anchor) return;
+    Object.assign(anchor, updates);
     this.notify('anchor');
   }
 
@@ -178,6 +178,7 @@ export class Store {
   }
 
   // ---- 连线路径计算（委托给 calc 模块） ----
+
   computeConnectionPath(conn: Connection): {
     start: Point;
     end: Point;
@@ -192,23 +193,42 @@ export class Store {
       const targetNode = this.getNode(targetAnchor.nodeId);
       if (!sourceNode || !targetNode) return null;
 
-      const start = calcAnchorPosForNode(sourceNode, sourceAnchor);
-      const end = calcAnchorPosForNode(targetNode, targetAnchor);
+      // ---- 获取方向 ----
+      const sourceOrient = getAnchorOrientation(sourceAnchor);
+      const targetOrient = getAnchorOrientation(targetAnchor);
+
+      // ---- 连续锚点外部点计算 ----
+      const sourceExternal =
+        sourceAnchor.type === AnchorType.CONTINUOUS
+          ? { x: targetNode.x + targetNode.width / 2, y: targetNode.y + targetNode.height / 2 }
+          : undefined;
+      const targetExternal =
+        targetAnchor.type === AnchorType.CONTINUOUS
+          ? { x: sourceNode.x + sourceNode.width / 2, y: sourceNode.y + sourceNode.height / 2 }
+          : undefined;
+
+      const start = calcAnchorPosForNode(sourceNode, sourceAnchor, sourceExternal);
+      const end = calcAnchorPosForNode(targetNode, targetAnchor, targetExternal);
+
       const result = computePath(start, end, conn.connectorType, {
-        stub: conn.stub ?? Defaults.connection.stub, // 默认 5
-        gap: conn.gap ?? Defaults.connection.gap, // 默认 0
+        stub: conn.stub ?? Defaults.connection.stub,
+        gap: conn.gap ?? Defaults.connection.gap,
+        sourceOrientation: sourceOrient,
+        targetOrientation: targetOrient,
+        alwaysRespectStubs: true, // 默认强制保留 stub
       });
-      return { start, end, pathD: result.pathD }; // ✅ 提取 pathD
+      console.log('sourceOrient:', sourceOrient, 'targetOrient:', targetOrient);
+      return { start, end, pathD: result.pathD };
     }
 
-    // 模式2：节点直连（连续锚点）
+    // 模式2：节点直连（连续锚点）——保持原有逻辑
     if (conn.sourceNodeId && conn.targetNodeId) {
       const sourceNode = this.getNode(conn.sourceNodeId);
       const targetNode = this.getNode(conn.targetNodeId);
       if (!sourceNode || !targetNode) return null;
       const { source, target } = getContinuousAnchorPair(sourceNode, targetNode);
       const result = computePath(source, target, conn.connectorType);
-      return { start: source, end: target, pathD: result.pathD }; // ✅ 提取 pathD
+      return { start: source, end: target, pathD: result.pathD };
     }
     return null;
   }
@@ -289,6 +309,42 @@ export class Store {
       c => c.sourceAnchorId === anchorId || c.targetAnchorId === anchorId
     ).length;
     return count >= max;
+  }
+  // src/core/store/Store.ts
+
+  // 在类末尾，isAnchorFull 方法之后添加：
+
+  /**
+   * 批量更新所有节点
+   * @param updates 节点属性的部分更新对象（忽略不存在的属性）
+   */
+  updateAllNodes(updates: Partial<Node>): void {
+    for (const [id, node] of this.nodes) {
+      Object.assign(node, updates);
+    }
+    this.notify('node');
+  }
+
+  /**
+   * 批量更新所有连线
+   * @param updates 连线属性的部分更新对象（忽略不存在的属性）
+   */
+  updateAllConnections(updates: Partial<Connection>): void {
+    for (const [id, conn] of this.connections) {
+      Object.assign(conn, updates);
+    }
+    this.notify('connection');
+  }
+
+  /**
+   * 批量更新所有锚点
+   * @param updates 锚点属性的部分更新对象（忽略不存在的属性）
+   */
+  updateAllAnchors(updates: Partial<Anchor>): void {
+    for (const [id, anchor] of this.anchors) {
+      Object.assign(anchor, updates);
+    }
+    this.notify('anchor');
   }
 }
 

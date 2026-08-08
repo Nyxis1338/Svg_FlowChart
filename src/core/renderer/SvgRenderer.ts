@@ -60,6 +60,18 @@ export class SvgRenderer {
   }
 
   renderAll(): void {
+    // 保存临时线节点（如果存在）
+    const tempNode = this.tempLineGroup;
+
+    // 清空连线层
+    this.layerManager.connectionLayer.innerHTML = '';
+
+    // 重新添加临时线（避免被清除）
+    if (tempNode) {
+      this.layerManager.connectionLayer.appendChild(tempNode);
+    }
+
+    // 渲染静态连线、锚点、节点
     this.connectionRenderer.render(this.reconnectingIds);
     this.anchorRenderer.render();
     this.nodeRenderer.render();
@@ -82,6 +94,7 @@ export class SvgRenderer {
     strokeWidth?: number,
     orientation?: { dx: number; dy: number } // 新增
   ): void {
+    console.log('📐 setTempLine 接收到的起点:', pos.x1, pos.y1);
     if (!this.tempLineGroup) {
       this.tempLineGroup = createSvgElement('g') as SVGGElement;
       this.tempLineGroup.setAttribute('pointer-events', 'none');

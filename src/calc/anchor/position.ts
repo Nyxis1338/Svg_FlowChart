@@ -5,36 +5,25 @@ import type { Node, Anchor } from '../../types/SvgModel';
 import { NodeShape, AnchorType, AnchorPosition } from '../../types/SvgModel';
 import { getStaticAnchor } from './static';
 import { getPerimeterAnchor } from './perimeter';
+import { getContinuousAnchorPosition } from './continuous'; // 新增导入
 
 /**
  * 根据节点和锚点计算锚点位置（主函数）
+ * @param node 节点对象
+ * @param anchor 锚点配置
+ * @param externalPoint 可选的外部点（用于连续锚点动态计算）
  */
-export function calcAnchorPosForNode(node: Node, anchor: Anchor): Point {
+export function calcAnchorPosForNode(node: Node, anchor: Anchor, externalPoint?: Point): Point {
   const rect = { x: node.x, y: node.y, width: node.width, height: node.height };
+
+  // 静态锚点
   if (anchor.type === AnchorType.STATIC && anchor.position) {
     return getStaticAnchorPositionWithShape(rect, node.shape, anchor.position, anchor.offset);
   }
-  if (anchor.type === AnchorType.CONTINUOUS) {
-    if (anchor.perimeterTotal !== undefined && anchor.perimeterIndex !== undefined) {
-      let pt = getPerimeterAnchor(rect, anchor.perimeterTotal, anchor.perimeterIndex);
-      if (anchor.offset) {
-        pt = { x: pt.x + anchor.offset.x, y: pt.y + anchor.offset.y };
-      }
-      return pt;
-    }
-    return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
-  }
-  return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
-}
 
-/**
- * 通用锚点位置计算（接受 Rect）
- */
-export function calcAnchorPos(rect: Rect, anchor: Anchor): Point {
-  if (anchor.type === AnchorType.STATIC && anchor.position) {
-    return getStaticAnchor(rect, anchor.position, anchor.offset);
-  }
+  // 连续锚点
   if (anchor.type === AnchorType.CONTINUOUS) {
+    // 如果有 perimeter 参数，使用均匀分布
     if (anchor.perimeterTotal !== undefined && anchor.perimeterIndex !== undefined) {
       let pt = getPerimeterAnchor(rect, anchor.perimeterTotal, anchor.perimeterIndex);
       if (anchor.offset) {
@@ -42,8 +31,31 @@ export function calcAnchorPos(rect: Rect, anchor: Anchor): Point {
       }
       return pt;
     }
-    return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+
+    // 如果有外部点，使用动态射线相交计算
+    if (externalPoint) {
+      return getContinuousAnchorPosition(node, externalPoint);
+    }
+
+    // 否则返回默认边缘点（根据方向）
+    const cx = rect.x + rect.width / 2;
+    const cy = rect.y + rect.height / 2;
+    const dir = anchor.direction || 'both';
+
+    // 优先使用 position 字段（如果存在）
+    if (anchor.position) {
+      return getStaticAnchor(rect, anchor.position, anchor.offset);
+    }
+
+    // 默认策略
+    if (dir === 'output' || dir === 'both') {
+      return { x: cx, y: rect.y + rect.height };
+    } else {
+      return { x: cx, y: rect.y };
+    }
   }
+
+  // 其他情况：返回节点中心
   return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
 }
 

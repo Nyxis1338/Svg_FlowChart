@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>连续锚点边缘滑动测试（手动拖拽）</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        padding: 20px;
+        font-family: 'Segoe UI', sans-serif;
+        background: #f0f2f5;
+      }
+      h2 {
+        margin-bottom: 12px;
+        font-weight: 400;
+      }
+      .tip {
+        background: #e3f2fd;
+        padding: 8px 14px;
+        border-radius: 4px;
+        margin-bottom: 12px;
+        display: inline-block;
+        font-size: 14px;
+      }
+      #container {
+        width: 100%;
+        height: 600px;
+        background: #fff;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      }
+      #log {
+        margin-top: 12px;
+        padding: 10px 14px;
+        background: #1e1e1e;
+        color: #d4d4d4;
+        border-radius: 4px;
+        font-family: monospace;
+        font-size: 13px;
+        max-height: 120px;
+        overflow-y: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <h2>🧪 连续锚点边缘滑动测试（手动拖拽）</h2>
+    <div class="tip">
+      从节点 A 的边缘拖拽创建连线到节点 B，然后拖动节点 A 绕节点 B 旋转，观察连线两端在节点边缘滑动。
+      <br />
+      节点右下角的淡蓝色小圆点表示该节点拥有连续锚点。
+    </div>
+    <div id="container"></div>
+    <div id="log">初始化...</div>
+
+    <script type="importmap">
+      { "imports": { "svg-flowchart": "../../src/" } }
+    </script>
+    <script type="module">
+      import { SvgEngine } from '../../src/core/SvgEngine';
+      import { NodeShape, AnchorType } from '../../src/types/SvgModel';
+
+      const container = document.getElementById('container');
+      const chart = new SvgEngine(container);
+      window.chart = chart;
+      const store = chart.store;
+      const logEl = document.getElementById('log');
+
+      function log(msg) {
+        logEl.textContent = msg;
+        console.log(msg);
+      }
+
+      // ---------- 创建节点 ----------
+      // 节点 A（源节点，连续锚点 output）
+      const nodeA = chart.addNode({
+        x: 180,
+        y: 220,
+        width: 140,
+        height: 90,
+        label: '节点 A',
+        shape: NodeShape.RECTANGLE,
+        stroke: '#7b1fa2',
+        strokeWidth: 3,
+      });
+      chart.addAnchor({
+        nodeId: nodeA.id,
+        type: AnchorType.CONTINUOUS,
+        direction: 'both',
+        radius: 6,
+      });
+
+      // 节点 B（目标节点，连续锚点 input）
+      const nodeB = chart.addNode({
+        x: 460,
+        y: 220,
+        width: 140,
+        height: 90,
+        label: '节点 B',
+        shape: NodeShape.RECTANGLE,
+        stroke: '#7b1fa2',
+        strokeWidth: 3,
+      });
+      chart.addAnchor({
+        nodeId: nodeB.id,
+        type: AnchorType.CONTINUOUS,
+        direction: 'both',
+        radius: 6,
+      });
+
+      // ---------- 不预先创建连线，等待用户手动拖拽 ----------
+      log('✅ 就绪。请从节点 A 边缘拖拽创建连线到节点 B，然后拖动 A 绕 B 旋转观察边缘滑动。');
+    </script>
+  </body>
+</html>

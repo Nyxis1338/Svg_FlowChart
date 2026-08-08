@@ -4,8 +4,8 @@ import type { Store } from '../store/Store';
 import type { SelectionManager } from '../selection/SelectionManager';
 import type { Node } from '../../types/SvgModel';
 import { createSvgElement } from '../../utils/dom';
-import { NodeShape } from '../../types/SvgModel';
 import { Defaults } from '../../styles/defaults';
+import { NodeShape, AnchorType } from '../../types/SvgModel';
 
 export class NodeRenderer {
   constructor(
@@ -60,9 +60,56 @@ export class NodeRenderer {
         g.appendChild(text);
       }
 
-      // ✅ 事件绑定已移除，由 EventBus 统一处理
+      const anchors = this.store.getNodeAnchors(node.id);
+      const hasContinuous = anchors.some(a => a.type === AnchorType.CONTINUOUS);
+      if (hasContinuous) {
+        const indicator = this.createContinuousIndicator(node);
+        g.appendChild(indicator);
+      }
+
+      // 事件绑定已由 EventBus 统一处理
       this.nodeLayer.appendChild(g);
     }
+  }
+
+  // 新增方法：创建连续锚点标识（半透明）
+  private createContinuousIndicator(node: Node): SVGGElement {
+    const g = createSvgElement('g') as SVGGElement;
+    const size = 16; // 稍微大一点便于点击
+    const cx = node.x + node.width - 20;
+    const cy = node.y + node.height - 20;
+
+    // 透明点击区域（半径 16，足够大）
+    const hitArea = createSvgElement('circle') as SVGCircleElement;
+    hitArea.setAttribute('cx', String(cx));
+    hitArea.setAttribute('cy', String(cy));
+    hitArea.setAttribute('r', '16');
+    hitArea.setAttribute('fill', 'transparent');
+    hitArea.setAttribute('pointer-events', 'all');
+    hitArea.dataset['continuousIndicator'] = 'true';
+    g.appendChild(hitArea);
+
+    // 视觉圆圈（半透明）
+    const circle = createSvgElement('circle') as SVGCircleElement;
+    circle.setAttribute('cx', String(cx));
+    circle.setAttribute('cy', String(cy));
+    circle.setAttribute('r', '7');
+    circle.setAttribute('fill', 'rgba(84, 112, 198, 0.25)');
+    circle.setAttribute('stroke', 'rgba(84, 112, 198, 0.6)');
+    circle.setAttribute('stroke-width', '1.5');
+    circle.setAttribute('pointer-events', 'none');
+    g.appendChild(circle);
+
+    // 内部小点
+    const dot = createSvgElement('circle') as SVGCircleElement;
+    dot.setAttribute('cx', String(cx));
+    dot.setAttribute('cy', String(cy));
+    dot.setAttribute('r', '3');
+    dot.setAttribute('fill', 'rgba(84, 112, 198, 0.8)');
+    dot.setAttribute('pointer-events', 'none');
+    g.appendChild(dot);
+
+    return g;
   }
 
   private createRect(node: Node, stroke: string, strokeWidth: number, isSelected: boolean): SVGRectElement {

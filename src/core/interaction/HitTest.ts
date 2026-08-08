@@ -3,6 +3,8 @@
 import type { Point } from '../../types/geometry';
 import type { Store } from '../store/Store';
 import type { Anchor, Node, Connection } from '../../types/SvgModel';
+import { getContinuousAnchorPosition } from '../../calc/anchor/continuous';
+import { AnchorType } from '../../types/SvgModel';
 
 export type HitTargetType = 'node' | 'anchor' | 'connection' | null;
 
@@ -29,7 +31,7 @@ export class HitTest {
     point: Point,
     store: Store,
     excludeAnchorId?: string,
-    hitRadius: number = 30 // 从 22 增大到 30
+    hitRadius: number = 12 // 从 12 增大到 30
   ): Anchor | null {
     const allAnchors = store.getAllAnchors();
     let closest: Anchor | null = null;
@@ -41,7 +43,15 @@ export class HitTest {
 
       const node = store.getNode(ap.nodeId);
       if (!node) continue;
-      const pos = store.calcAnchorPosForNode(node, ap);
+
+      let pos: Point;
+      if (ap.type === AnchorType.CONTINUOUS) {
+        // 使用鼠标位置动态计算连续锚点位置
+        pos = getContinuousAnchorPosition(node, point);
+      } else {
+        pos = store.calcAnchorPosForNode(node, ap);
+      }
+
       const dist = Math.hypot(point.x - pos.x, point.y - pos.y);
       if (dist < minDist) {
         minDist = dist;

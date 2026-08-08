@@ -1,4 +1,6 @@
-import type { Point, Rect } from "../types/geometry";
+// src/calc/geometry.ts
+
+import type { Point, Rect } from '../types/geometry';
 
 /**
  * 几何计算工具集
@@ -76,8 +78,8 @@ export const Geometry = {
    * @returns 投影点坐标（如果投影点在线段延长线上，则返回最近的端点）
    */
   projectPointOnSegment(point: Point, s1: Point, s2: Point): Point {
-    const v = this.subtract(s2, s1);      // 线段方向向量
-    const w = this.subtract(point, s1);   // 点到起点的向量
+    const v = this.subtract(s2, s1); // 线段方向向量
+    const w = this.subtract(point, s1); // 点到起点的向量
     const c1 = this.dot(w, v);
 
     // 投影点在线段起点之前
@@ -106,10 +108,22 @@ export const Geometry = {
   } {
     const { x, y, width, height } = rect;
     return {
-      top: [{ x, y }, { x: x + width, y }],
-      right: [{ x: x + width, y }, { x: x + width, y: y + height }],
-      bottom: [{ x: x + width, y: y + height }, { x, y: y + height }],
-      left: [{ x, y: y + height }, { x, y }]
+      top: [
+        { x, y },
+        { x: x + width, y },
+      ],
+      right: [
+        { x: x + width, y },
+        { x: x + width, y: y + height },
+      ],
+      bottom: [
+        { x: x + width, y: y + height },
+        { x, y: y + height },
+      ],
+      left: [
+        { x, y: y + height },
+        { x, y },
+      ],
     };
   },
 
@@ -125,7 +139,7 @@ export const Geometry = {
   /**
    * 根据周长比例在矩形边框上获取对应的点坐标
    * 适用于 PerimeterAnchor 等需要沿节点边缘均匀分布锚点的场景
-   * 
+   *
    * @param rect 矩形区域
    * @param proportion 比例值，范围 [0, 1]
    *   - 0 对应矩形左上角（从顶部边开始）
@@ -146,7 +160,7 @@ export const Geometry = {
       { pts: edges.top, length: rect.width },
       { pts: edges.right, length: rect.height },
       { pts: edges.bottom, length: rect.width },
-      { pts: edges.left, length: rect.height }
+      { pts: edges.left, length: rect.height },
     ];
 
     for (const e of edgeList) {
@@ -156,7 +170,7 @@ export const Geometry = {
         const t = e.length > 0 ? dist / e.length : 0;
         return {
           x: s.x + (ePt.x - s.x) * t,
-          y: s.y + (ePt.y - s.y) * t
+          y: s.y + (ePt.y - s.y) * t,
         };
       }
       dist -= e.length;
@@ -164,5 +178,67 @@ export const Geometry = {
 
     // 如果由于浮点误差导致未返回，返回起点（左上角）作为兜底
     return { x: rect.x, y: rect.y };
-  }
+  },
+
+  /**
+   * 计算从原点沿方向向量出发的射线与轴对齐矩形（AABB）的交点
+   * @param rect 矩形区域
+   * @param origin 射线起点（通常为节点中心）
+   * @param direction 方向向量（指向鼠标或对端中心）
+   * @returns 交点坐标；若无交点则返回 null
+   */
+  rayRectIntersect(rect: Rect, origin: Point, direction: Point): Point | null {
+    const { x, y, width, height } = rect;
+    const { x: ox, y: oy } = origin;
+    const { x: dx, y: dy } = direction;
+
+    // 如果方向向量几乎为零，返回原点
+    const eps = 1e-10;
+    if (Math.abs(dx) < eps && Math.abs(dy) < eps) {
+      return { x: ox, y: oy };
+    }
+
+    let tMin = -Infinity;
+    let tMax = Infinity;
+
+    // X 轴方向
+    if (Math.abs(dx) < eps) {
+      // 射线垂直，如果原点不在矩形 X 范围内则无交点
+      if (ox < x - eps || ox > x + width + eps) return null;
+    } else {
+      let t1 = (x - ox) / dx;
+      let t2 = (x + width - ox) / dx;
+      if (t1 > t2) {
+        [t1, t2] = [t2, t1];
+      }
+      tMin = Math.max(tMin, t1);
+      tMax = Math.min(tMax, t2);
+    }
+
+    // Y 轴方向
+    if (Math.abs(dy) < eps) {
+      if (oy < y - eps || oy > y + height + eps) return null;
+    } else {
+      let t1 = (y - oy) / dy;
+      let t2 = (y + height - oy) / dy;
+      if (t1 > t2) {
+        [t1, t2] = [t2, t1];
+      }
+      tMin = Math.max(tMin, t1);
+      tMax = Math.min(tMax, t2);
+    }
+
+    // 无交点，或交点位于射线反方向
+    if (tMin > tMax || tMax < 0) return null;
+
+    // 取最近的正交点
+    const t = tMin > eps ? tMin : tMax;
+    // 额外保护：如果 t 为负无穷或正无穷，返回原点
+    if (!isFinite(t)) return { x: ox, y: oy };
+
+    return {
+      x: ox + t * dx,
+      y: oy + t * dy,
+    };
+  },
 };

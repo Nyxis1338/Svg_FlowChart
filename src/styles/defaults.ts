@@ -67,6 +67,15 @@ export const Defaults = {
     offsetY: -10,
     fontFamily: 'sans-serif',
   },
+
+  /** 连接手柄默认样式（新增） */
+  handle: {
+    size: 16,
+    stroke: '#5470c6',
+    strokeWidth: 2,
+    background: 'rgba(255,255,255,0.9)',
+    hoverStroke: '#ff6b6b',
+  },
 } as const;
 
 /** 预设连线颜色（8种优雅色） */

@@ -1,2 +1,4 @@
-export * from "./geometry";
-export * from "./SvgModel";
+// src/types/index.ts
+
+export * from './geometry';
+export * from './SvgModel';

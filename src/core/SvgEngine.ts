@@ -7,9 +7,11 @@ import { DragManager } from './interaction/DragManager';
 import { SvgRenderer } from './renderer/SvgRenderer';
 import type { Node, Connection, Anchor } from '../types/SvgModel';
 import type { Point } from '../types/geometry';
-import { uuidv4 } from '../utils/uuid';
+import { AnchorType } from '../types/SvgModel';
 import { EventBus } from './interaction/EventBus';
 import { ContextMenu } from './interaction/ContextMenu'; // ✅ 新增导入
+
+import { Defaults } from '../styles/defaults';
 
 export class SvgEngine {
   public readonly svgRoot: SVGSVGElement;
@@ -69,7 +71,8 @@ export class SvgEngine {
   // ==================== 节点操作 ====================
   /** 添加纯节点（不自动生成锚点） */
   addNode(data: Omit<Node, 'id'>): Node {
-    const id = `node-${uuidv4()}`;
+    const id = `node-${crypto.randomUUID()}`;
+
     const node: Node = { id, ...data };
     return this.store.addNode(node);
   }
@@ -92,7 +95,8 @@ export class SvgEngine {
 
   // ==================== 连线操作 ====================
   addConnection(data: Omit<Connection, 'id'>): Connection {
-    const id = `connect-${uuidv4()}`;
+    const id = `connect-${crypto.randomUUID()}`;
+
     const conn: Connection = { id, ...data };
     return this.store.addConnection(conn);
   }
@@ -115,8 +119,13 @@ export class SvgEngine {
 
   // ==================== 锚点操作 ====================
   addAnchor(data: Omit<Anchor, 'id'>): Anchor {
-    const id = `anchor-${uuidv4()}`;
-    const anchor: Anchor = { id, ...data };
+    const anchorData = { ...data };
+    if (anchorData.type === AnchorType.CONTINUOUS) {
+      anchorData.direction = 'both';
+    }
+    const id = `anchor-${crypto.randomUUID()}`;
+
+    const anchor: Anchor = { id, ...anchorData };
     return this.store.addAnchor(anchor);
   }
 
@@ -130,6 +139,36 @@ export class SvgEngine {
 
   removeAnchor(id: string): void {
     this.store.removeAnchor(id);
+  }
+
+  updateAnchor(id: string, updates: Partial<Anchor>): void {
+    this.store.updateAnchor(id, updates);
+  }
+
+  // ==================== 批量更新 ====================
+
+  /**
+   * 更新所有节点的样式或属性
+   * @param updates 节点属性的部分更新对象（忽略不存在的属性）
+   */
+  updateAllNodes(updates: Partial<Node>): void {
+    this.store.updateAllNodes(updates);
+  }
+
+  /**
+   * 更新所有连线的样式或属性
+   * @param updates 连线属性的部分更新对象（忽略不存在的属性）
+   */
+  updateAllConnections(updates: Partial<Connection>): void {
+    this.store.updateAllConnections(updates);
+  }
+
+  /**
+   * 更新所有锚点的样式或属性
+   * @param updates 锚点属性的部分更新对象（忽略不存在的属性）
+   */
+  updateAllAnchors(updates: Partial<Anchor>): void {
+    this.store.updateAllAnchors(updates);
   }
 
   // ==================== 视图操作 ====================

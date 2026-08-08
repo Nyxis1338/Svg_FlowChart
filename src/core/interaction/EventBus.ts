@@ -4,6 +4,9 @@ import type { SvgEngine } from '../SvgEngine';
 import type { Store } from '../store/Store';
 import type { SelectionManager } from '../selection/SelectionManager';
 import type { DragManager } from './DragManager';
+import type { Point } from '../../types/geometry';
+import { AnchorType } from '../../types/SvgModel';
+import type { Anchor, Node } from '../../types/SvgModel';
 
 export class EventBus {
   private chart: SvgEngine;
@@ -12,6 +15,10 @@ export class EventBus {
   private dragManager: DragManager;
 
   private isMenuVisible: boolean = false;
+  private isDragging: boolean = false;
+
+  // 用于判断点击还是拖拽
+  private mouseDownPos: Point | null = null;
 
   constructor(chart: SvgEngine) {
     this.chart = chart;
@@ -24,57 +31,39 @@ export class EventBus {
 
   private bindEvents() {
     const svg = this.chart.getSvgRoot();
+
+    // 鼠标事件
     svg.addEventListener('mousedown', this.onMouseDown.bind(this));
-    svg.addEventListener('click', this.onClick.bind(this));
+    window.addEventListener('mousemove', this.onMouseMove.bind(this), { passive: true });
+    window.addEventListener('mouseup', this.onMouseUp.bind(this));
+
+    // 右键菜单
     svg.addEventListener('contextmenu', this.onContextMenu.bind(this));
     document.addEventListener('mousedown', this.hideMenu.bind(this));
+
+    // 键盘事件（保留在 DragManager 中，因为它处理删除等业务逻辑）
+    // 但不重新绑定，由 DragManager 自行管理
   }
 
+  // ==================== 鼠标事件 ====================
+
   private onMouseDown(e: MouseEvent) {
-    const screenX = e.clientX;
-    const screenY = e.clientY;
-    const canvasPos = this.chart.viewport.screenToCanvas({ x: screenX, y: screenY });
-    console.log(
-      `🖱️ mousedown: screen(${screenX}, ${screenY}) -> canvas(${canvasPos.x.toFixed(1)}, ${canvasPos.y.toFixed(1)})`
-    );
+    if (e.button !== 0) return;
+    if (this.chart.viewport.isSpaceActive()) return;
 
     const target = e.target as SVGElement;
+    const canvasPos = this.chart.viewport.screenToCanvas({ x: e.clientX, y: e.clientY });
 
-    if (target.tagName === 'circle' && target.hasAttribute('data-anchor-id')) {
-      const anchorId = target.getAttribute('data-anchor-id')!;
-      const anchor = this.store.getAnchor(anchorId);
-      if (anchor) {
-        const node = this.store.getNode(anchor.nodeId);
-        console.log(`⚓ 点击锚点 (mousedown): ${anchorId}`);
-        if (node) {
-          console.log(
-            `  节点: ${node.label || '未命名'} 坐标: (${node.x}, ${node.y}) 尺寸: ${node.width}x${node.height}`
-          );
-          console.log(`  方向: ${anchor.direction}`); // 新增
-          const anchorPos = this.store.calcAnchorPosForNode(node, anchor);
-          console.log(`  锚点逻辑位置 (calcAnchorPosForNode): (${anchorPos.x.toFixed(1)}, ${anchorPos.y.toFixed(1)})`);
-          // 手动计算锚点位置
-          if (anchor.type === 'static' && anchor.position) {
-            const manualPos = this.calcManualAnchorPos(node, anchor.position);
-            // console.log(`  手动计算锚点位置: (${manualPos.x.toFixed(1)}, ${manualPos.y.toFixed(1)})`);
-          }
-          // console.log(`  鼠标画布位置: (${canvasPos.x.toFixed(1)}, ${canvasPos.y.toFixed(1)})`);
-          // console.log(
-          //   `  偏差: dx=${(canvasPos.x - anchorPos.x).toFixed(1)}, dy=${(canvasPos.y - anchorPos.y).toFixed(1)}`
-          // );
-
-          // 获取实际 DOM 元素的 cx/cy
-          const circle = target as SVGCircleElement;
-          const actualCx = circle.getAttribute('cx');
-          const actualCy = circle.getAttribute('cy');
-          console.log(`  🔍 实际 DOM cx/cy: (${actualCx}, ${actualCy})`);
-        }
-        this.dragManager.startLinkDrag(anchor, e);
-        return;
-      }
+    // ---------- 1. 检测小圆点（连续锚点标识） ----------
+    const indicator = target.closest('[data-continuous-indicator="true"]');
+    if (indicator) {
+      this.dragManager.startNodeDrag(e);
+      e.stopPropagation();
+      e.preventDefault();
+      return;
     }
 
-    // 检测连线
+    // ---------- 2. 检测连线（点击选中） ----------
     let connId: string | undefined;
     let el: SVGElement | null = target;
     while (el && !connId) {
@@ -84,53 +73,88 @@ export class EventBus {
       el = parent as unknown as SVGElement;
     }
     if (connId) {
-      console.log(`🔗 选中连线: ${connId}`);
+      // 选中连线
       this.selection.select('connection', connId);
+      e.stopPropagation();
+      e.preventDefault();
       return;
     }
 
-    // 检测节点
+    // ---------- 3. 检测普通锚点（圆圈） ----------
+    if (target.tagName === 'circle' && target.hasAttribute('data-anchor-id')) {
+      const anchorId = target.getAttribute('data-anchor-id')!;
+      const anchor = this.store.getAnchor(anchorId);
+      if (anchor) {
+        this.dragManager.startLinkDrag(anchor, e);
+        e.stopPropagation();
+        e.preventDefault();
+        return;
+      }
+    }
+
+    // ---------- 4. 检测节点 ----------
     let nodeId: string | undefined;
-    let nodeEl: SVGElement | null = target;
-    while (nodeEl && !nodeId) {
-      nodeId = nodeEl.getAttribute('data-node-id') ?? undefined;
-      const parent = nodeEl.parentElement;
+    el = target;
+    while (el && !nodeId) {
+      nodeId = el.getAttribute('data-node-id') ?? undefined;
+      const parent = el.parentElement;
       if (!parent) break;
-      nodeEl = parent as unknown as SVGElement;
+      el = parent as unknown as SVGElement;
     }
-    if (nodeId) {
-      console.log(`📦 点击节点: ${nodeId}`);
-      this.dragManager.startNodeDrag(e);
+
+    if (!nodeId) {
+      // 点击空白 -> 清空选中
+      this.selection.clear();
       return;
     }
 
-    // 点击空白区域
-    if (target === this.chart.getSvgRoot() || target.tagName === 'svg') {
-      console.log('⬜ 点击空白区域，清空选中');
-      this.selection.clear();
+    const node = this.store.getNode(nodeId);
+    if (!node) return;
+
+    // ---------- 5. 判断节点是否有连续锚点 ----------
+    const anchors = this.store.getNodeAnchors(nodeId);
+    const continuousAnchor = anchors.find(
+      a => a.type === AnchorType.CONTINUOUS && (a.direction === 'output' || a.direction === 'both')
+    );
+
+    if (continuousAnchor) {
+      // 有连续锚点 -> 启动连线拖拽（因为小圆点已提前处理）
+      this.dragManager.startLinkDrag(continuousAnchor, e);
+      e.stopPropagation();
+      e.preventDefault();
+      return;
     }
+
+    // 6. 无连续锚点 -> 节点拖拽
+    this.dragManager.startNodeDrag(e);
+    e.stopPropagation();
+    e.preventDefault();
   }
 
-  // 手动计算锚点位置（用于对比）
-  private calcManualAnchorPos(node: any, position: string): { x: number; y: number } {
-    const cx = node.x + node.width / 2;
-    const cy = node.y + node.height / 2;
-    switch (position) {
-      case 'top':
-        return { x: cx, y: node.y };
-      case 'right':
-        return { x: node.x + node.width, y: cy };
-      case 'bottom':
-        return { x: cx, y: node.y + node.height };
-      case 'left':
-        return { x: node.x, y: cy };
-      default:
-        return { x: cx, y: cy };
-    }
+  private onMouseMove(e: MouseEvent) {
+    // 由 DragManager 驱动，但 DragManager 已不绑定事件
+    // 此方法保留为将来可能的前置处理，但实际逻辑由 DragManager 的 processMove 通过 RAF 驱动
+    // 不在这里做任何处理，让 DragManager 自己管理
   }
 
-  private onClick(e: MouseEvent) {
-    // 保留原逻辑，但不做操作
+  private onMouseUp(e: MouseEvent) {
+    // 由 DragManager 驱动，但 DragManager 已不绑定事件
+    // 此方法保留为将来可能的前置处理
+  }
+
+  // ==================== 辅助方法 ====================
+
+  private hitTestNodeEdge(canvasPos: Point): Node | null {
+    const threshold = 15;
+    const nodes = this.store.getAllNodes();
+    for (const node of nodes) {
+      const rect = { x: node.x, y: node.y, width: node.width, height: node.height };
+      const dx = Math.max(rect.x - canvasPos.x, 0, canvasPos.x - (rect.x + rect.width));
+      const dy = Math.max(rect.y - canvasPos.y, 0, canvasPos.y - (rect.y + rect.height));
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist <= threshold) return node;
+    }
+    return null;
   }
 
   private onContextMenu(e: MouseEvent) {
@@ -152,8 +176,9 @@ export class EventBus {
   destroy() {
     const svg = this.chart.getSvgRoot();
     svg.removeEventListener('mousedown', this.onMouseDown.bind(this));
-    svg.removeEventListener('click', this.onClick.bind(this));
     svg.removeEventListener('contextmenu', this.onContextMenu.bind(this));
+    window.removeEventListener('mousemove', this.onMouseMove.bind(this));
+    window.removeEventListener('mouseup', this.onMouseUp.bind(this));
     document.removeEventListener('mousedown', this.hideMenu.bind(this));
   }
 }

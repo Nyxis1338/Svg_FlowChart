@@ -1,3 +1,5 @@
+// src/types/geometry.ts
+
 export interface Point {
   x: number;
   y: number;
