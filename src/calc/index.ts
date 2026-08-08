@@ -18,3 +18,6 @@ export * from './anchor';
 
 // 导出连线路径生成模块
 export * from './connector';
+
+// 导出连线构建器
+export * from './connection-builder';

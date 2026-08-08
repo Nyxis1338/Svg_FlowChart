@@ -1,3 +1,5 @@
+// src/calc/connector/bezier.ts
+
 import type { Point } from '../../types/geometry';
 
 /**

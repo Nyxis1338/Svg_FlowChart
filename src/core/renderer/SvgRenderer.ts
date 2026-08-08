@@ -8,10 +8,8 @@ import { AnchorRenderer } from './AnchorRenderer';
 import { ConnectionRenderer } from './ConnectionRenderer';
 import { DragManager } from '../interaction/DragManager';
 import type { SelectionManager } from '../selection/SelectionManager';
-import { createSvgElement } from '../../utils/dom';
 import { ConnectorType } from '../../types';
-import { connectorBezier } from '../../calc/connector/bezier';
-import { connectorFlowchart } from '../../calc/connector/flowchart';
+import { TempLineManager } from './TempLineManager';
 import { Defaults } from '../../styles/defaults';
 
 export class SvgRenderer {
@@ -25,10 +23,7 @@ export class SvgRenderer {
   private nodeRenderer: NodeRenderer;
   private anchorRenderer: AnchorRenderer;
   private connectionRenderer: ConnectionRenderer;
-
-  private tempLineGroup: SVGGElement | null = null;
-  private tempLineEl: SVGPathElement | null = null;
-  private tempDotEl: SVGCircleElement | null = null;
+  private tempLineManager: TempLineManager;
 
   private reconnectingIds = new Set<string>();
 
@@ -39,7 +34,6 @@ export class SvgRenderer {
     this.dragManager = chart.dragManager;
     this.selection = chart.selection;
 
-    // 使用 contentGroup 作为图层的父容器
     this.layerManager = new LayerManager(this.viewport.getContentGroup());
 
     this.nodeRenderer = new NodeRenderer(this.chart.store, this.selection, this.layerManager.nodeLayer);
@@ -49,6 +43,9 @@ export class SvgRenderer {
       this.selection,
       this.layerManager.connectionLayer
     );
+
+    // 初始化临时线管理器
+    this.tempLineManager = new TempLineManager(this.layerManager.connectionLayer);
 
     // 点击空白画布清空选择
     this.svgRoot.addEventListener('mousedown', () => {
@@ -61,7 +58,7 @@ export class SvgRenderer {
 
   renderAll(): void {
     // 保存临时线节点（如果存在）
-    const tempNode = this.tempLineGroup;
+    const tempNode = this.tempLineManager.getGroup();
 
     // 清空连线层
     this.layerManager.connectionLayer.innerHTML = '';
@@ -86,72 +83,28 @@ export class SvgRenderer {
     this.renderAll();
   }
 
+  // ==================== 临时线代理 ====================
+
   setTempLine(
     pos: { x1: number; y1: number; x2: number; y2: number },
     connectorType?: ConnectorType,
     isReconnect: boolean = false,
     stroke?: string,
     strokeWidth?: number,
-    orientation?: { dx: number; dy: number } // 新增
+    orientation?: { dx: number; dy: number }
   ): void {
-    console.log('📐 setTempLine 接收到的起点:', pos.x1, pos.y1);
-    if (!this.tempLineGroup) {
-      this.tempLineGroup = createSvgElement('g') as SVGGElement;
-      this.tempLineGroup.setAttribute('pointer-events', 'none');
-
-      this.tempLineEl = createSvgElement('path') as SVGPathElement;
-      this.tempLineEl.setAttribute('fill', 'none');
-      this.tempLineGroup.appendChild(this.tempLineEl);
-
-      this.tempDotEl = createSvgElement('circle') as SVGCircleElement;
-      this.tempDotEl.setAttribute('r', '6');
-      this.tempDotEl.setAttribute('fill', 'rgba(150,150,150,0.5)');
-      this.tempDotEl.setAttribute('stroke', 'none');
-      this.tempLineGroup.appendChild(this.tempDotEl);
-
-      this.layerManager.connectionLayer.appendChild(this.tempLineGroup);
-    }
-
-    if (isReconnect && stroke) {
-      this.tempLineEl!.setAttribute('stroke', stroke);
-      this.tempLineEl!.setAttribute('stroke-width', String(strokeWidth || 2));
-      this.tempLineEl!.setAttribute('stroke-dasharray', 'none');
-    } else {
-      this.tempLineEl!.setAttribute('stroke', 'rgba(150,150,150,0.7)');
-      this.tempLineEl!.setAttribute('stroke-width', '2.5');
-      this.tempLineEl!.setAttribute('stroke-dasharray', '8 4');
-    }
-
-    let pathD: string;
-    const start = { x: pos.x1, y: pos.y1 };
-    const end = { x: pos.x2, y: pos.y2 };
-
-    if (connectorType === ConnectorType.FLOWCHART) {
-      pathD = connectorFlowchart(start, end, orientation, Defaults.connection.stub);
-    } else if (connectorType === ConnectorType.BEZIER) {
-      pathD = connectorBezier(start, end, 0.5, 40);
-    } else {
-      pathD = `M${pos.x1} ${pos.y1} L${pos.x2} ${pos.y2}`;
-    }
-
-    this.tempLineEl!.setAttribute('d', pathD);
-    this.tempDotEl!.setAttribute('cx', String(pos.x2));
-    this.tempDotEl!.setAttribute('cy', String(pos.y2));
-    // console.log('pathD:', pathD);
+    this.tempLineManager.setTempLine(pos, connectorType, isReconnect, stroke, strokeWidth, orientation);
   }
 
   clearTempLine(): void {
-    if (this.tempLineGroup) {
-      this.tempLineGroup.remove();
-      this.tempLineGroup = null;
-      this.tempLineEl = null;
-      this.tempDotEl = null;
-    }
+    this.tempLineManager.clear();
   }
 
   getTempLineExists(): boolean {
-    return !!this.tempLineGroup;
+    return this.tempLineManager.exists();
   }
+
+  // ==================== 高亮代理 ====================
 
   highlightAnchor(anchorId: string, highlight: boolean): void {
     this.anchorRenderer.highlightAnchor(anchorId, highlight);
@@ -159,9 +112,7 @@ export class SvgRenderer {
 
   destroy(): void {
     this.layerManager.destroy();
-    this.tempLineGroup = null;
-    this.tempLineEl = null;
-    this.tempDotEl = null;
+    this.tempLineManager.destroy();
     this.reconnectingIds.clear();
   }
 }

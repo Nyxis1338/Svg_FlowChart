@@ -158,3 +158,73 @@ TypeScript（类型安全）
 MIT
 
 
+
+```
+Svg_FlowChart
+├─ .prettierrc
+├─ 1.md
+├─ assets
+│  └─ style.css
+├─ demo
+│  ├─ batch-update
+│  │  └─ index.html
+│  ├─ connection-handle
+│  │  └─ index.html
+│  ├─ continuous-edge
+│  │  └─ index.html
+│  └─ stub-demo
+│     └─ index.html
+├─ index.html
+├─ package-lock.json
+├─ package.json
+├─ README.md
+├─ src
+│  ├─ calc
+│  │  ├─ anchor
+│  │  │  ├─ continuous.ts
+│  │  │  ├─ index.ts
+│  │  │  ├─ perimeter.ts
+│  │  │  ├─ position.ts
+│  │  │  └─ static.ts
+│  │  ├─ connector
+│  │  │  ├─ bezier.ts
+│  │  │  ├─ flowchart.ts
+│  │  │  ├─ generator.ts
+│  │  │  ├─ index.ts
+│  │  │  ├─ path.ts
+│  │  │  └─ straight.ts
+│  │  ├─ geometry.ts
+│  │  └─ index.ts
+│  ├─ core
+│  │  ├─ interaction
+│  │  │  ├─ ContextMenu.ts
+│  │  │  ├─ DragManager.ts
+│  │  │  ├─ EventBus.ts
+│  │  │  └─ HitTest.ts
+│  │  ├─ renderer
+│  │  │  ├─ AnchorRenderer.ts
+│  │  │  ├─ ConnectionRenderer.ts
+│  │  │  ├─ LayerManager.ts
+│  │  │  ├─ NodeRenderer.ts
+│  │  │  └─ SvgRenderer.ts
+│  │  ├─ selection
+│  │  │  └─ SelectionManager.ts
+│  │  ├─ store
+│  │  │  └─ Store.ts
+│  │  ├─ SvgEngine.ts
+│  │  └─ viewport
+│  │     └─ ViewportManager.ts
+│  ├─ main.ts
+│  ├─ styles
+│  │  └─ defaults.ts
+│  ├─ types
+│  │  ├─ geometry.ts
+│  │  ├─ index.ts
+│  │  └─ SvgModel.ts
+│  └─ utils
+│     ├─ anchor-helpers.ts
+│     └─ dom.ts
+├─ ts.md
+└─ tsconfig.json
+
+```

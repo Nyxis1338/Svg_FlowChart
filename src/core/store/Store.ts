@@ -1,11 +1,10 @@
 // src/core/store/Store.ts
 
-import type { Point, Rect } from '../../types/geometry';
+import type { Point } from '../../types/geometry';
 import type { Anchor, Node, Connection } from '../../types/SvgModel';
-import { NodeShape, AnchorType, ConnectorType, AnchorPosition } from '../../types/SvgModel';
-import { getContinuousAnchorPair } from '../../calc';
+import { ConnectorType } from '../../types/SvgModel';
 import { Defaults } from '../../styles/defaults';
-import { getAnchorOrientation } from '../../utils/anchor-helpers';
+import { computeConnectionPath } from '../../calc';
 
 // ==================== 类型定义 ====================
 type StoreChangeType = 'node' | 'anchor' | 'connection';
@@ -178,59 +177,12 @@ export class Store {
   }
 
   // ---- 连线路径计算（委托给 calc 模块） ----
-
   computeConnectionPath(conn: Connection): {
     start: Point;
     end: Point;
     pathD: string;
   } | null {
-    // 模式1：锚点相连
-    if (conn.sourceAnchorId && conn.targetAnchorId) {
-      const sourceAnchor = this.getAnchor(conn.sourceAnchorId);
-      const targetAnchor = this.getAnchor(conn.targetAnchorId);
-      if (!sourceAnchor || !targetAnchor) return null;
-      const sourceNode = this.getNode(sourceAnchor.nodeId);
-      const targetNode = this.getNode(targetAnchor.nodeId);
-      if (!sourceNode || !targetNode) return null;
-
-      // ---- 获取方向 ----
-      const sourceOrient = getAnchorOrientation(sourceAnchor);
-      const targetOrient = getAnchorOrientation(targetAnchor);
-
-      // ---- 连续锚点外部点计算 ----
-      const sourceExternal =
-        sourceAnchor.type === AnchorType.CONTINUOUS
-          ? { x: targetNode.x + targetNode.width / 2, y: targetNode.y + targetNode.height / 2 }
-          : undefined;
-      const targetExternal =
-        targetAnchor.type === AnchorType.CONTINUOUS
-          ? { x: sourceNode.x + sourceNode.width / 2, y: sourceNode.y + sourceNode.height / 2 }
-          : undefined;
-
-      const start = calcAnchorPosForNode(sourceNode, sourceAnchor, sourceExternal);
-      const end = calcAnchorPosForNode(targetNode, targetAnchor, targetExternal);
-
-      const result = computePath(start, end, conn.connectorType, {
-        stub: conn.stub ?? Defaults.connection.stub,
-        gap: conn.gap ?? Defaults.connection.gap,
-        sourceOrientation: sourceOrient,
-        targetOrientation: targetOrient,
-        alwaysRespectStubs: true, // 默认强制保留 stub
-      });
-      console.log('sourceOrient:', sourceOrient, 'targetOrient:', targetOrient);
-      return { start, end, pathD: result.pathD };
-    }
-
-    // 模式2：节点直连（连续锚点）——保持原有逻辑
-    if (conn.sourceNodeId && conn.targetNodeId) {
-      const sourceNode = this.getNode(conn.sourceNodeId);
-      const targetNode = this.getNode(conn.targetNodeId);
-      if (!sourceNode || !targetNode) return null;
-      const { source, target } = getContinuousAnchorPair(sourceNode, targetNode);
-      const result = computePath(source, target, conn.connectorType);
-      return { start: source, end: target, pathD: result.pathD };
-    }
-    return null;
+    return computeConnectionPath(conn, this.getAnchor.bind(this), this.getNode.bind(this));
   }
 
   // ---- 锚点位置计算（委托给 calc 模块） ----

@@ -1,4 +1,6 @@
-import type { Point } from "../../types/geometry";
+// src/calc/connector/straight.ts
+
+import type { Point } from '../../types/geometry';
 
 /**
  * 直线连接器：生成从起点到终点的直线路径

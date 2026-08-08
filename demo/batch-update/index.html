@@ -252,12 +252,12 @@
       }
 
       const bRight = store.getNodeAnchors(nodeB.id).find(a => a.position === AnchorPosition.RIGHT);
-      const cRight = store.getNodeAnchors(nodeC.id).find(a => a.position === AnchorPosition.RIGHT);
-      if (bRight && cRight) {
+      const cBottom = store.getNodeAnchors(nodeC.id).find(a => a.position === AnchorPosition.BOTTOM);
+      if (bRight && cBottom) {
         chart.addConnection({
           connectorType: ConnectorType.STRAIGHT,
           sourceAnchorId: bRight.id,
-          targetAnchorId: cRight.id,
+          targetAnchorId: cBottom.id,
           stroke: ConnectorColors[2],
           strokeWidth: 2,
           label: { text: '连线 3', fontSize: 14, color: '#333', offset: { x: 0, y: -15 } },
