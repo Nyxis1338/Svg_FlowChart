@@ -13,14 +13,16 @@ export class ConnectionRenderer {
   constructor(
     private readonly store: Store,
     private readonly selection: SelectionManager,
-    private readonly connectionLayer: SVGGElement
+    private readonly elementLayer: SVGGElement
   ) {}
 
   render(skipIds?: Set<string>): void {
-    this.connectionLayer.innerHTML = '';
+    // ❌ 不再清空 layer，由 SvgRenderer 统一清空
     const connections = this.store.getAllConnections();
+    // 按 zIndex 升序排序
+    const sorted = [...connections].sort((a, b) => (a.zIndex ?? 100) - (b.zIndex ?? 100));
 
-    for (const conn of connections) {
+    for (const conn of sorted) {
       if (skipIds && skipIds.has(conn.id)) {
         continue;
       }
@@ -38,6 +40,7 @@ export class ConnectionRenderer {
       const g = createSvgElement('g') as SVGGElement;
       g.dataset['connectionId'] = conn.id;
       g.style.cursor = 'pointer';
+      g.dataset['zIndex'] = String(conn.zIndex ?? 100);
 
       const path = createSvgElement('path') as SVGPathElement;
       path.setAttribute('d', adjustedPathD);
@@ -64,8 +67,8 @@ export class ConnectionRenderer {
         if (arrowEl) g.appendChild(arrowEl);
       }
 
-      // ✅ 事件绑定已移除，由 EventBus 统一处理
-      this.connectionLayer.appendChild(g);
+      // ✅ 添加到统一的 elementLayer
+      this.elementLayer.appendChild(g);
     }
   }
 

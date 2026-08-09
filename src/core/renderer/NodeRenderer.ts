@@ -2,7 +2,7 @@
 
 import type { Store } from '../store/Store';
 import type { SelectionManager } from '../selection/SelectionManager';
-import type { Node } from '../../types/SvgModel';
+import type { Node, Anchor } from '../../types/SvgModel';
 import { createSvgElement } from '../../utils/dom';
 import { Defaults } from '../../styles/defaults';
 import { NodeShape, AnchorType } from '../../types/SvgModel';
@@ -11,17 +11,21 @@ export class NodeRenderer {
   constructor(
     private readonly store: Store,
     private readonly selection: SelectionManager,
-    private readonly nodeLayer: SVGGElement
+    private readonly elementLayer: SVGGElement
   ) {}
 
   render(): void {
-    this.nodeLayer.innerHTML = '';
+    // 不在此清空图层，由 SvgRenderer 统一清空
     const nodes = this.store.getAllNodes();
+    // 按 zIndex 升序排序（小的在下层）
+    const sorted = [...nodes].sort((a, b) => (a.zIndex ?? 100) - (b.zIndex ?? 100));
 
-    for (const node of nodes) {
+    for (const node of sorted) {
       const g = createSvgElement('g') as SVGGElement;
       g.setAttribute('data-node-id', node.id);
+      g.dataset['zIndex'] = String(node.zIndex ?? 100);
 
+      // 渲染节点形状
       const isSelected = this.selection.isSelected('node', node.id);
       const defaultStroke = Defaults.node.stroke;
       const defaultStrokeWidth = Defaults.node.strokeWidth;
@@ -43,9 +47,9 @@ export class NodeRenderer {
           shapeEl = this.createRect(node, strokeColor, strokeWidth, isSelected);
           break;
       }
-
       g.appendChild(shapeEl);
 
+      // 渲染标签
       if (node.label) {
         const text = createSvgElement('text') as SVGTextElement;
         const cx = node.x + node.width / 2;
@@ -60,26 +64,50 @@ export class NodeRenderer {
         g.appendChild(text);
       }
 
+      // 渲染锚点（作为节点的子元素）
       const anchors = this.store.getNodeAnchors(node.id);
+      for (const ap of anchors) {
+        if (ap.type === AnchorType.CONTINUOUS) continue; // 连续锚点不可见
+        const pos = this.store.calcAnchorPosForNode(node, ap);
+        const circle = createSvgElement('circle') as SVGCircleElement;
+        const radius = ap.radius ?? Defaults.anchor.radius;
+        circle.setAttribute('cx', String(pos.x));
+        circle.setAttribute('cy', String(pos.y));
+        circle.setAttribute('r', String(radius));
+        circle.style.cursor = 'default';
+        circle.style.transition = 'all 0.15s ease-out';
+        circle.dataset['anchorId'] = ap.id;
+
+        // 从 defaults 读取方向样式
+        const dirStyle = Defaults.anchor.directionStyles[ap.direction] || Defaults.anchor.directionStyles.both;
+        const fill = ap.fill ?? dirStyle.fill;
+        const stroke = ap.stroke ?? dirStyle.stroke;
+        const strokeWidthVal = ap.strokeWidth ?? dirStyle.strokeWidth;
+        circle.setAttribute('fill', fill);
+        circle.setAttribute('stroke', stroke);
+        circle.setAttribute('stroke-width', String(strokeWidthVal));
+        g.appendChild(circle);
+      }
+
+      // 连续锚点标识（如果有）
       const hasContinuous = anchors.some(a => a.type === AnchorType.CONTINUOUS);
       if (hasContinuous) {
         const indicator = this.createContinuousIndicator(node);
         g.appendChild(indicator);
       }
 
-      // 事件绑定已由 EventBus 统一处理
-      this.nodeLayer.appendChild(g);
+      this.elementLayer.appendChild(g);
     }
   }
 
-  // 新增方法：创建连续锚点标识（半透明）
+  // 连续锚点标识（保持不变）
   private createContinuousIndicator(node: Node): SVGGElement {
+    // ... 与之前相同 ...
     const g = createSvgElement('g') as SVGGElement;
-    const size = 16; // 稍微大一点便于点击
+    const size = 16;
     const cx = node.x + node.width - 20;
     const cy = node.y + node.height - 20;
 
-    // 透明点击区域（半径 16，足够大）
     const hitArea = createSvgElement('circle') as SVGCircleElement;
     hitArea.setAttribute('cx', String(cx));
     hitArea.setAttribute('cy', String(cy));
@@ -89,7 +117,6 @@ export class NodeRenderer {
     hitArea.dataset['continuousIndicator'] = 'true';
     g.appendChild(hitArea);
 
-    // 视觉圆圈（半透明）
     const circle = createSvgElement('circle') as SVGCircleElement;
     circle.setAttribute('cx', String(cx));
     circle.setAttribute('cy', String(cy));
@@ -100,7 +127,6 @@ export class NodeRenderer {
     circle.setAttribute('pointer-events', 'none');
     g.appendChild(circle);
 
-    // 内部小点
     const dot = createSvgElement('circle') as SVGCircleElement;
     dot.setAttribute('cx', String(cx));
     dot.setAttribute('cy', String(cy));
@@ -112,6 +138,7 @@ export class NodeRenderer {
     return g;
   }
 
+  // ✅ 补全所有创建方法
   private createRect(node: Node, stroke: string, strokeWidth: number, isSelected: boolean): SVGRectElement {
     const rect = createSvgElement('rect') as SVGRectElement;
     rect.setAttribute('x', String(node.x));

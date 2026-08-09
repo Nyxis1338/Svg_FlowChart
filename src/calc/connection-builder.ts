@@ -1,4 +1,4 @@
-// src/calc/connection-path.ts
+// src/calc/connection-builder.ts
 
 import type { Point } from '../types/geometry';
 import type { Connection, Anchor, Node } from '../types/SvgModel';
@@ -7,20 +7,48 @@ import { Defaults } from '../styles/defaults';
 import { calcAnchorPosForNode } from './anchor/position';
 import { computePath } from './connector/path';
 import { getContinuousAnchorPair } from './anchor/continuous';
+import { getAnchorOrientation } from '../utils/anchor-helpers';
+import { pathIntersectsNodes, detourPath } from './correctline';
+
+function applyGapAndStub(anchorPos: Point, node: Node, anchor: Anchor, gap: number, stub: number): Point {
+  const orientation = getAnchorOrientation(anchor, node);
+  const totalOffset = gap + stub;
+  return {
+    x: anchorPos.x + orientation.dx * totalOffset,
+    y: anchorPos.y + orientation.dy * totalOffset,
+  };
+}
 
 /**
- * 计算连线路径（纯函数）
- * @param conn 连线对象
- * @param getAnchor 获取锚点的函数
- * @param getNode 获取节点的函数
- * @returns 路径信息，包含起点、终点和路径字符串；若无效则返回 null
+ * 解析 SVG path 字符串为点数组
  */
+function parsePathD(pathD: string): Point[] {
+  const points: Point[] = [];
+  const parts = pathD.match(/[ML]\s*([\d.]+)\s*([\d.]+)/g);
+  if (parts) {
+    for (const part of parts) {
+      const [, x, y] = part.match(/([\d.]+)\s*([\d.]+)/) || [];
+      if (x && y) points.push({ x: parseFloat(x), y: parseFloat(y) });
+    }
+  }
+  return points;
+}
+
+function pointsToPathD(points: Point[]): string {
+  if (points.length === 0) return '';
+  let d = `M ${points[0].x} ${points[0].y}`;
+  for (let i = 1; i < points.length; i++) {
+    d += ` L ${points[i].x} ${points[i].y}`;
+  }
+  return d;
+}
+
 export function computeConnectionPath(
   conn: Connection,
   getAnchor: (id: string) => Anchor | undefined,
-  getNode: (id: string) => Node | undefined
+  getNode: (id: string) => Node | undefined,
+  allNodes?: Node[]
 ): { start: Point; end: Point; pathD: string } | null {
-  // 模式1：锚点相连
   if (conn.sourceAnchorId && conn.targetAnchorId) {
     const sourceAnchor = getAnchor(conn.sourceAnchorId);
     const targetAnchor = getAnchor(conn.targetAnchorId);
@@ -29,49 +57,39 @@ export function computeConnectionPath(
     const targetNode = getNode(targetAnchor.nodeId);
     if (!sourceNode || !targetNode) return null;
 
-    // 连续锚点外部点计算（用于动态锚点位置）
-    const sourceExternal =
-      sourceAnchor.type === AnchorType.CONTINUOUS
-        ? { x: targetNode.x + targetNode.width / 2, y: targetNode.y + targetNode.height / 2 }
-        : undefined;
-    const targetExternal =
-      targetAnchor.type === AnchorType.CONTINUOUS
-        ? { x: sourceNode.x + sourceNode.width / 2, y: sourceNode.y + sourceNode.height / 2 }
-        : undefined;
+    const gap = conn.gap ?? Defaults.connection.gap;
+    const stub = conn.stub ?? Defaults.connection.stub;
 
-    const start = calcAnchorPosForNode(sourceNode, sourceAnchor, sourceExternal);
-    const end = calcAnchorPosForNode(targetNode, targetAnchor, targetExternal);
+    // 原始锚点坐标
+    const rawStart = calcAnchorPosForNode(sourceNode, sourceAnchor);
+    const rawEnd = calcAnchorPosForNode(targetNode, targetAnchor);
 
-    // 获取方向（用于 flowchart 的 stub）
-    // 注意：我们仍然需要从 Anchor 获取 orientation，但这里不再引入 Store 依赖
-    // 我们可以在 calc 层提供一个工具函数，或者直接在 Store 中计算并传入
-    // 但为了保持纯函数，我们这里简化：仅传递 stub/gap，不传递方向（由 connectorFlowchart 内部自适应）
-    // 如果你需要支持方向，可以在调用 computePath 时传入 sourceOrientation/targetOrientation
-    const result = computePath(start, end, conn.connectorType, {
-      stub: conn.stub ?? Defaults.connection.stub,
-      gap: conn.gap ?? Defaults.connection.gap,
-      alwaysRespectStubs: true,
-    });
+    // 应用 gap+stub（法线方向）
+    const start = applyGapAndStub(rawStart, sourceNode, sourceAnchor, gap, stub);
+    const end = applyGapAndStub(rawEnd, targetNode, targetAnchor, gap, stub);
+
+    // 生成路径
+    let result = computePath(start, end, conn.connectorType);
+
+    // 如果提供了所有节点，进行绕行检测
+    if (allNodes && allNodes.length > 0) {
+      const pathPoints = parsePathD(result.pathD);
+      const detection = pathIntersectsNodes(pathPoints, allNodes, sourceNode.id, targetNode.id);
+      if (detection.intersects && detection.node) {
+        // 尝试向上绕行
+        let detouredPoints = detourPath(pathPoints, detection.node, 'up');
+        let recheck = pathIntersectsNodes(detouredPoints, allNodes, sourceNode.id, targetNode.id);
+        if (recheck.intersects) {
+          // 向上不行，尝试向下
+          detouredPoints = detourPath(pathPoints, detection.node, 'down');
+        }
+        result.pathD = pointsToPathD(detouredPoints);
+      }
+    }
 
     return { start, end, pathD: result.pathD };
   }
 
-  // 模式2：节点直连（连续锚点）
-  if (conn.sourceNodeId && conn.targetNodeId) {
-    const sourceNode = getNode(conn.sourceNodeId);
-    const targetNode = getNode(conn.targetNodeId);
-    if (!sourceNode || !targetNode) return null;
-    const { source, target } = getContinuousAnchorPair(
-      { x: sourceNode.x, y: sourceNode.y, width: sourceNode.width, height: sourceNode.height },
-      { x: targetNode.x, y: targetNode.y, width: targetNode.width, height: targetNode.height }
-    );
-    const result = computePath(source, target, conn.connectorType, {
-      stub: conn.stub ?? Defaults.connection.stub,
-      gap: conn.gap ?? Defaults.connection.gap,
-      alwaysRespectStubs: true,
-    });
-    return { start: source, end: target, pathD: result.pathD };
-  }
-
+  // 模式2：节点直连（略）
   return null;
 }

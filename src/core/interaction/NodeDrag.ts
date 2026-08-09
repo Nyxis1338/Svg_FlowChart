@@ -1,4 +1,4 @@
-// src/core/interaction/NodeDragManager.ts
+// src/core/interaction/NodeDrag.ts
 
 import type { Point } from '../../types/geometry';
 import type { SvgEngine } from '../SvgEngine';
@@ -9,9 +9,13 @@ import type { SelectionManager } from '../selection/SelectionManager';
 import type { DragManager } from './DragManager';
 import { DragState } from './DragManager';
 
-export class NodeDragManager {
-  private readonly chart: SvgEngine;
+/**
+ * 节点拖拽执行器
+ * 处理节点拖拽的完整生命周期
+ */
+export class NodeDrag {
   private readonly dragManager: DragManager;
+  private readonly chart: SvgEngine;
 
   constructor(dragManager: DragManager) {
     this.dragManager = dragManager;
@@ -31,8 +35,11 @@ export class NodeDragManager {
     return this.chart.renderer;
   }
 
-  startNodeDrag(evt: MouseEvent): void {
-    if (this.dragManager.state !== DragState.IDLE) return;
+  /**
+   * 启动节点拖拽
+   */
+  start(evt: MouseEvent): void {
+    if (this.dragManager.state !== 'idle') return;
 
     const target = evt.target as SVGElement;
     let nodeId: string | undefined;
@@ -57,28 +64,36 @@ export class NodeDragManager {
     this.dragManager.state = DragState.NODE_DRAGGING;
   }
 
+  /**
+   * 处理节点拖拽的移动更新
+   */
   processMove(canvasPos: Point): boolean {
-    const nodeDragData = this.dragManager.nodeDragData;
-    if (!nodeDragData) return false;
+    const data = this.dragManager.nodeDragData;
+    if (!data) return false;
 
-    const { nodeId, offset } = nodeDragData;
+    const { nodeId, offset } = data;
     const newX = canvasPos.x - offset.x;
     const newY = canvasPos.y - offset.y;
     this.store.updateNode(nodeId, { x: newX, y: newY });
     return true;
   }
 
-  endNodeDrag(): void {
-    const nodeDragData = this.dragManager.nodeDragData;
-    if (!nodeDragData) return;
+  /**
+   * 结束节点拖拽
+   */
+  end(_evt?: MouseEvent): void {
+    const data = this.dragManager.nodeDragData;
+    if (!data) return;
 
-    const nodeId = nodeDragData.nodeId;
-    this.selection.select('node', nodeId);
+    this.selection.select('node', data.nodeId);
     this.dragManager.nodeDragData = null;
     this.dragManager.state = DragState.IDLE;
   }
 
-  cancelNodeDrag(): void {
+  /**
+   * 取消节点拖拽
+   */
+  cancel(): void {
     this.dragManager.nodeDragData = null;
   }
 }

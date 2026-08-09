@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>gap + stub 垂直引出与绕行调试</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        padding: 20px;
+        font-family: 'Segoe UI', sans-serif;
+        background: #f5f7fa;
+      }
+      h2 {
+        margin-bottom: 12px;
+        font-weight: 400;
+      }
+      .toolbar {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-bottom: 16px;
+      }
+      .toolbar button {
+        padding: 6px 16px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        background: #fff;
+        cursor: pointer;
+        font-size: 13px;
+        transition: 0.2s;
+      }
+      .toolbar button:hover {
+        background: #e3f2fd;
+        border-color: #1976d2;
+      }
+      .toolbar button.active {
+        background: #1976d2;
+        color: #fff;
+        border-color: #1976d2;
+      }
+      #container {
+        width: 100%;
+        height: 600px;
+        background: #fff;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      }
+      #log {
+        margin-top: 12px;
+        padding: 8px 14px;
+        background: #1e1e1e;
+        color: #d4d4d4;
+        border-radius: 4px;
+        font-family: monospace;
+        font-size: 13px;
+        max-height: 120px;
+        overflow-y: auto;
+        white-space: pre-wrap;
+      }
+      .status {
+        display: inline-block;
+        padding: 2px 10px;
+        border-radius: 12px;
+        font-size: 12px;
+        margin-left: 8px;
+      }
+      .ok {
+        background: #2ecc71;
+        color: #fff;
+      }
+      .err {
+        background: #e74c3c;
+        color: #fff;
+      }
+    </style>
+  </head>
+  <body>
+    <h2>🔧 gap + stub 垂直引出与绕行调试</h2>
+    <div class="toolbar">
+      <button id="btn-stub" class="active">显示 stub</button>
+      <button id="btn-gap">显示 gap</button>
+      <button id="btn-detour">启用绕行</button>
+      <button id="btn-reset">重置节点位置</button>
+      <span id="status-badge" style="margin-left: auto"><span class="status ok">✅ 正常</span></span>
+    </div>
+    <div id="container"></div>
+    <div id="log">初始化... 拖拽节点可观察 stub 方向</div>
+
+    <script type="importmap">
+      { "imports": { "svg-flowchart": "../../src/" } }
+    </script>
+    <script type="module">
+      import { SvgEngine } from '../../src/core/SvgEngine';
+      import { NodeShape, AnchorPosition, AnchorType, ConnectorType, ArrowDirection } from '../../src/types/SvgModel';
+
+      const container = document.getElementById('container');
+      const chart = new SvgEngine(container);
+      window.chart = chart;
+      const store = chart.store;
+      const logEl = document.getElementById('log');
+      const statusBadge = document.getElementById('status-badge');
+
+      function log(msg) {
+        logEl.textContent = msg;
+        console.log(msg);
+      }
+
+      // ---- 创建两个矩形节点（左右排列） ----
+      const nodeA = chart.addNode({
+        x: 120,
+        y: 200,
+        width: 140,
+        height: 90,
+        label: 'A',
+        shape: NodeShape.RECTANGLE,
+        stroke: '#7b1fa2',
+        strokeWidth: 3,
+      });
+      chart.addAnchor({
+        nodeId: nodeA.id,
+        type: AnchorType.STATIC,
+        position: AnchorPosition.RIGHT,
+        direction: 'output',
+        radius: 6,
+        fill: '#ffffff',
+        stroke: '#5470c6',
+      });
+
+      const nodeB = chart.addNode({
+        x: 440,
+        y: 200,
+        width: 140,
+        height: 90,
+        label: 'B',
+        shape: NodeShape.RECTANGLE,
+        stroke: '#7b1fa2',
+        strokeWidth: 3,
+      });
+      chart.addAnchor({
+        nodeId: nodeB.id,
+        type: AnchorType.STATIC,
+        position: AnchorPosition.LEFT,
+        direction: 'input',
+        radius: 6,
+        fill: '#e8f5e9',
+        stroke: '#43a047',
+      });
+
+      // ---- 创建连线（使用流程图类型，stub=40, gap=5） ----
+      const aRight = store.getNodeAnchors(nodeA.id).find(a => a.position === AnchorPosition.RIGHT);
+      const bLeft = store.getNodeAnchors(nodeB.id).find(a => a.position === AnchorPosition.LEFT);
+      if (aRight && bLeft) {
+        chart.addConnection({
+          connectorType: ConnectorType.FLOWCHART,
+          sourceAnchorId: aRight.id,
+          targetAnchorId: bLeft.id,
+          stroke: '#e74c3c',
+          strokeWidth: 3,
+          stub: 40,
+          gap: 5,
+          arrow: { direction: ArrowDirection.TARGET, length: 14 },
+        });
+      }
+
+      log('✅ 就绪。拖动节点 A 或 B，观察 stub 是否垂直引出且不穿入节点。');
+
+      // ---- 按钮事件 ----
+      document.getElementById('btn-stub').addEventListener('click', function () {
+        this.classList.toggle('active');
+        log('stub 显示已切换');
+      });
+      document.getElementById('btn-gap').addEventListener('click', function () {
+        this.classList.toggle('active');
+        log('gap 显示已切换');
+      });
+      document.getElementById('btn-detour').addEventListener('click', function () {
+        this.classList.toggle('active');
+        const enabled = this.classList.contains('active');
+        // 这里可以调用 chart.setDetourEnabled(enabled) 未来实现
+        log(`绕行 ${enabled ? '启用' : '禁用'}`);
+        statusBadge.innerHTML = enabled
+          ? '<span class="status ok">✅ 绕行启用</span>'
+          : '<span class="status err">⛔ 绕行禁用</span>';
+      });
+      document.getElementById('btn-reset').addEventListener('click', () => {
+        chart.updateNode(nodeA.id, { x: 120, y: 200 });
+        chart.updateNode(nodeB.id, { x: 440, y: 200 });
+        log('节点位置已重置');
+      });
+
+      // 监听节点移动，输出法线信息
+      chart.store.subscribe(() => {
+        const conn = store.getAllConnections()[0];
+        if (conn) {
+          const pathInfo = store.computeConnectionPath(conn);
+          if (pathInfo) {
+            console.log('起点:', pathInfo.start, '终点:', pathInfo.end);
+          }
+        }
+      });
+    </script>
+  </body>
+</html>

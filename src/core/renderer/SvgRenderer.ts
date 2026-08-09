@@ -10,7 +10,6 @@ import { DragManager } from '../interaction/DragManager';
 import type { SelectionManager } from '../selection/SelectionManager';
 import { ConnectorType } from '../../types';
 import { TempLineManager } from './TempLineManager';
-import { Defaults } from '../../styles/defaults';
 
 export class SvgRenderer {
   private readonly chart: SvgEngine;
@@ -36,18 +35,18 @@ export class SvgRenderer {
 
     this.layerManager = new LayerManager(this.viewport.getContentGroup());
 
-    this.nodeRenderer = new NodeRenderer(this.chart.store, this.selection, this.layerManager.nodeLayer);
-    this.anchorRenderer = new AnchorRenderer(this.chart.store, this.dragManager, this.layerManager.anchorLayer);
-    this.connectionRenderer = new ConnectionRenderer(
+    // 渲染器仍然使用独立的图层，但都指向 elementLayer（锚点作为节点子元素，在 NodeRenderer 中处理）
+    this.nodeRenderer = new NodeRenderer(this.chart.store, this.selection, this.layerManager.elementLayer);
+    this.anchorRenderer = new AnchorRenderer(
       this.chart.store,
-      this.selection,
-      this.layerManager.connectionLayer
+      this.layerManager.elementLayer // 锚点直接添加到 elementLayer（但会作为节点子元素？需要调整）
     );
+    this.connectionRenderer = new ConnectionRenderer(this.chart.store, this.selection, this.layerManager.elementLayer);
 
-    // 初始化临时线管理器
-    this.tempLineManager = new TempLineManager(this.layerManager.connectionLayer);
+    // 初始化临时线管理器，使用 tempLayer
+    this.tempLineManager = new TempLineManager(this.layerManager.tempLayer);
 
-    // 点击空白画布清空选择
+    // 点击空白画布清空选择（仍有效）
     this.svgRoot.addEventListener('mousedown', () => {
       this.selection.clear();
     });
@@ -57,21 +56,48 @@ export class SvgRenderer {
   }
 
   renderAll(): void {
-    // 保存临时线节点（如果存在）
-    const tempNode = this.tempLineManager.getGroup();
+    // 清空正式元素图层
+    this.layerManager.elementLayer.innerHTML = '';
 
-    // 清空连线层
-    this.layerManager.connectionLayer.innerHTML = '';
+    // 重新渲染节点、锚点、连线（它们都会添加到 elementLayer）
+    // 注意顺序：先渲染连线（底层），再渲染节点（上层），但两者都是独立添加到 elementLayer，
+    // 我们直接让 NodeRenderer 和 ConnectionRenderer 添加，然后整体排序？
+    // 更好的方式：在 render 中统一收集所有元素并按 zIndex 排序后一次性添加。
+    // 但为了最小改动，我们让 NodeRenderer 和 ConnectionRenderer 各自添加，然后我们统一排序它们的子元素。
 
-    // 重新添加临时线（避免被清除）
-    if (tempNode) {
-      this.layerManager.connectionLayer.appendChild(tempNode);
-    }
-
-    // 渲染静态连线、锚点、节点
+    // 方案：先调用各渲染器，它们会向 elementLayer 添加子元素，
+    // 然后我们对 elementLayer 中的子元素按 zIndex 排序重新插入。
     this.connectionRenderer.render(this.reconnectingIds);
-    this.anchorRenderer.render();
     this.nodeRenderer.render();
+
+    // 由于 AnchorRenderer 是独立添加锚点到 elementLayer，我们需要让锚点成为节点的子元素，
+    // 所以应该修改 NodeRenderer 来同时绘制锚点，AnchorRenderer 可以废弃或保留为独立添加（但会导致锚点独立于节点）。
+    // 为了 z-index 统一，建议锚点作为节点的子元素，这样锚点跟随节点叠放。
+    // 因此，我们将在 NodeRenderer 中绘制锚点，而 AnchorRenderer 只用于高亮等辅助功能（不再添加新元素）。
+    // 所以我们在此注释掉 anchorRenderer.render()，改为在 NodeRenderer 中处理。
+    // this.anchorRenderer.render(); // 暂时注释
+
+    // 排序 elementLayer 中的所有子元素（按 zIndex）
+    this.sortElementsByZIndex();
+
+    // 临时线由 TempLineManager 自行管理，无需额外操作
+  }
+
+  /**
+   * 对 elementLayer 中的子元素按 zIndex 升序排序
+   */
+  private sortElementsByZIndex(): void {
+    const children = Array.from(this.layerManager.elementLayer.children) as SVGElement[];
+    // 按 zIndex 排序（从 data-z-index 属性读取）
+    children.sort((a, b) => {
+      const za = parseInt(a.dataset['zIndex'] ?? '100', 10);
+      const zb = parseInt(b.dataset['zIndex'] ?? '100', 10);
+      return za - zb;
+    });
+    // 重新插入
+    for (const child of children) {
+      this.layerManager.elementLayer.appendChild(child);
+    }
   }
 
   setReconnecting(connId: string, isReconnecting: boolean): void {

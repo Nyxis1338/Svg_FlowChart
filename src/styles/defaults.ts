@@ -34,6 +34,23 @@ export const Defaults = {
     hoverRadiusMultiplier: 1.6,
     hoverShadow: 'drop-shadow(0 0 8px rgba(255,107,107,0.5))',
     direction: 'both', // 'input' | 'output' | 'both'
+    directionStyles: {
+      output: {
+        fill: '#ffffff',
+        stroke: '#5470c6',
+        strokeWidth: 2,
+      },
+      input: {
+        fill: '#e8f5e9',
+        stroke: '#43a047',
+        strokeWidth: 2,
+      },
+      both: {
+        fill: '#ffffff',
+        stroke: '#9c27b0',
+        strokeWidth: 2,
+      },
+    },
   },
 
   /** 连线默认样式 */

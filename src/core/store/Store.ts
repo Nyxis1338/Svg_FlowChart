@@ -36,7 +36,8 @@ export class Store {
 
   // ---- Node 操作 ----
   addNode(node: Node): Node {
-    this.nodes.set(node.id, structuredClone(node));
+    const newNode = { ...node, zIndex: node.zIndex ?? this.getNextZIndex() };
+    this.nodes.set(node.id, structuredClone(newNode));
     this.notify('node');
     return node;
   }
@@ -100,9 +101,7 @@ export class Store {
     }
     this.notify('anchor');
   }
-  /**
-   * 删除节点的所有锚点（同时删除关联连线）
-   */
+
   removeAllAnchors(nodeId: string): void {
     // 获取该节点的所有锚点
     const nodeAnchors = this.getNodeAnchors(nodeId);
@@ -111,7 +110,9 @@ export class Store {
       this.removeAnchor(anchor.id);
     }
   }
+
   getNodeAnchors(nodeId: string): Anchor[] {
+    // 获取节点下的所有锚点
     return [...this.anchors.values()].filter(a => a.nodeId === nodeId).map(a => structuredClone(a));
   }
 
@@ -136,7 +137,8 @@ export class Store {
       // 假设 defaultType 是 'straight' | 'bezier' | 'flowchart' 之一
       conn.connectorType = defaultType as ConnectorType;
     }
-    this.connections.set(conn.id, structuredClone(conn));
+    const newConn = { ...conn, zIndex: conn.zIndex ?? this.getNextZIndex() };
+    this.connections.set(newConn.id, structuredClone(newConn));
     this.notify('connection');
     return conn;
   }
@@ -155,11 +157,7 @@ export class Store {
     return [...this.connections.values()].map(c => structuredClone(c));
   }
 
-  /**
-   * 查找使用指定锚点的连线（双向查找）
-   * @param anchorId 锚点ID
-   * @returns 如果找到则返回连线对象，否则返回 undefined
-   */
+  //查找使用指定锚点的连线（双向查找）
   findConnectionByAnchor(anchorId: string): Connection | undefined {
     for (const conn of this.connections.values()) {
       if (conn.sourceAnchorId === anchorId || conn.targetAnchorId === anchorId) {
@@ -182,7 +180,7 @@ export class Store {
     end: Point;
     pathD: string;
   } | null {
-    return computeConnectionPath(conn, this.getAnchor.bind(this), this.getNode.bind(this));
+    return computeConnectionPath(conn, this.getAnchor.bind(this), this.getNode.bind(this), this.getAllNodes());
   }
 
   // ---- 锚点位置计算（委托给 calc 模块） ----
@@ -216,10 +214,8 @@ export class Store {
     this.notify('node');
   }
 
-  /**
-   * 更新连线的源锚点（用于重连）
-   * @returns 是否更新成功（如果目标相同或重复则返回 false）
-   */
+  // ---- 重连辅助 ----
+  // 更新连线的源锚点（用于重连）
   updateConnectionSource(connId: string, newSourceAnchorId: string): boolean {
     const conn = this.connections.get(connId);
     if (!conn) return false;
@@ -233,10 +229,7 @@ export class Store {
     return true;
   }
 
-  /**
-   * 更新连线的目标锚点（用于重连）
-   * @returns 是否更新成功（如果目标相同或重复则返回 false）
-   */
+  // 更新连线的目标锚点（用于重连）
   updateConnectionTarget(connId: string, newTargetAnchorId: string): boolean {
     const conn = this.connections.get(connId);
     if (!conn) return false;
@@ -250,9 +243,8 @@ export class Store {
     return true;
   }
 
-  /**
-   * 检查锚点是否已达到最大连线数量
-   */
+  // ---- 容量检查 ----
+  // 检查锚点是否已达到最大连线数量
   isAnchorFull(anchorId: string): boolean {
     const max = Defaults.connection.maxConnections;
     // 如果 max <= 0，视为无限制
@@ -262,14 +254,8 @@ export class Store {
     ).length;
     return count >= max;
   }
-  // src/core/store/Store.ts
 
-  // 在类末尾，isAnchorFull 方法之后添加：
-
-  /**
-   * 批量更新所有节点
-   * @param updates 节点属性的部分更新对象（忽略不存在的属性）
-   */
+  // ---- 批量更新 ----
   updateAllNodes(updates: Partial<Node>): void {
     for (const [id, node] of this.nodes) {
       Object.assign(node, updates);
@@ -277,10 +263,6 @@ export class Store {
     this.notify('node');
   }
 
-  /**
-   * 批量更新所有连线
-   * @param updates 连线属性的部分更新对象（忽略不存在的属性）
-   */
   updateAllConnections(updates: Partial<Connection>): void {
     for (const [id, conn] of this.connections) {
       Object.assign(conn, updates);
@@ -288,15 +270,59 @@ export class Store {
     this.notify('connection');
   }
 
-  /**
-   * 批量更新所有锚点
-   * @param updates 锚点属性的部分更新对象（忽略不存在的属性）
-   */
   updateAllAnchors(updates: Partial<Anchor>): void {
     for (const [id, anchor] of this.anchors) {
       Object.assign(anchor, updates);
     }
     this.notify('anchor');
+  }
+
+  // ---- z-index ----
+  private getMaxZIndex(): number {
+    let max = 99; // 初始值
+    for (const node of this.nodes.values()) {
+      if (node.zIndex !== undefined && node.zIndex > max) max = node.zIndex;
+    }
+    for (const conn of this.connections.values()) {
+      if (conn.zIndex !== undefined && conn.zIndex > max) max = conn.zIndex;
+    }
+    return max;
+  }
+
+  private getNextZIndex(): number {
+    return this.getMaxZIndex() + 1;
+  }
+
+  // 新增：更新节点 zIndex
+  updateNodeZIndex(nodeId: string, newZIndex: number): void {
+    const node = this.nodes.get(nodeId);
+    if (!node) return;
+    node.zIndex = newZIndex;
+    this.notify('node');
+  }
+
+  // 新增：更新连线 zIndex
+  updateConnectionZIndex(connId: string, newZIndex: number): void {
+    const conn = this.connections.get(connId);
+    if (!conn) return;
+    conn.zIndex = newZIndex;
+    this.notify('connection');
+  }
+
+  // 新增：批量调整 zIndex（用于置顶/置底）
+  getCurrentMaxZIndex(): number {
+    return this.getMaxZIndex();
+  }
+
+  getCurrentMinZIndex(): number {
+    let min = Infinity;
+    for (const node of this.nodes.values()) {
+      if (node.zIndex !== undefined && node.zIndex < min) min = node.zIndex;
+    }
+    for (const conn of this.connections.values()) {
+      if (conn.zIndex !== undefined && conn.zIndex < min) min = conn.zIndex;
+    }
+    return min === Infinity ? 100 : min;
   }
 }
 

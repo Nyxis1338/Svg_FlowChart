@@ -79,6 +79,7 @@ export interface Node {
   strokeWidth?: number;
   selected?: boolean;
   anchorIds?: string[];
+  zIndex?: number;
   data?: Record<string, unknown>;
 }
 
@@ -91,11 +92,11 @@ export interface Anchor {
   radius?: number;
   fill?: string;
   stroke?: string;
+  strokeWidth?: string;
   offset?: Point;
   perimeterTotal?: number; // 仅 CONTINUOUS 有效
   perimeterIndex?: number; // 仅 CONTINUOUS 有效
   visible?: boolean;
-  connectionsDetachable?: boolean;
   data?: Record<string, unknown>;
 }
 
@@ -111,10 +112,10 @@ export interface Connection {
   label?: LabelConfig;
   arrow?: ArrowConfig;
   selected?: boolean;
-  detachable?: boolean;
-  reattach?: boolean;
+  fixed?: boolean; // 是否固定（不可拖拽），默认 false
   stub?: number;
   gap?: number;
+  zIndex?: number;
 }
 
 // ==================== 容器与视图状态 ====================

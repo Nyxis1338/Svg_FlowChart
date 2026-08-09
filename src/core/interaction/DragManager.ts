@@ -6,9 +6,10 @@ import type { Store } from '../store/Store';
 import type { ViewportManager } from '../viewport/ViewportManager';
 import type { SvgRenderer } from '../renderer/SvgRenderer';
 import type { SelectionManager } from '../selection/SelectionManager';
-import type { Anchor, Node, Connection } from '../../types/SvgModel';
-import { NodeDragManager } from './NodeDragManager';
-import { ConnectionDragManager } from './ConnectionDragManager';
+import type { Anchor } from '../../types/SvgModel';
+import { NodeDrag } from './NodeDrag';
+import { ConnectionDrag } from './ConnectionDrag';
+import { ReConnectionDrag } from './ReConnectionDrag';
 
 export enum DragState {
   IDLE = 'idle',
@@ -18,7 +19,7 @@ export enum DragState {
 }
 
 export class DragManager {
-  // 共享状态（由子管理器直接读写）
+  // 共享状态（由子执行器直接读写）
   public state: DragState = DragState.IDLE;
   public nodeDragData: { nodeId: string; offset: Point } | null = null;
   public linkDragData: {
@@ -52,9 +53,8 @@ export class DragManager {
   private lastMoveEvent: MouseEvent | null = null;
   private dragEventsBound = false;
 
-  // 子管理器
-  private nodeDragManager: NodeDragManager;
-  private connectionDragManager: ConnectionDragManager;
+  // 当前活跃的执行器
+  private currentExecutor: NodeDrag | ConnectionDrag | ReConnectionDrag | null = null;
 
   public get isDragging(): boolean {
     return this.state !== DragState.IDLE;
@@ -62,20 +62,31 @@ export class DragManager {
 
   constructor(chart: SvgEngine) {
     this.chart = chart;
-    this.nodeDragManager = new NodeDragManager(this);
-    this.connectionDragManager = new ConnectionDragManager(this);
   }
 
   // ==================== 公共入口 ====================
 
   public startNodeDrag(evt: MouseEvent): void {
-    this.nodeDragManager.startNodeDrag(evt);
+    if (this.state !== DragState.IDLE) return;
+    this.currentExecutor = new NodeDrag(this);
+    this.currentExecutor.start(evt);
     this.bindDragEvents();
     evt.preventDefault();
   }
 
   public startLinkDrag(anchor: Anchor, evt: MouseEvent): void {
-    this.connectionDragManager.startLinkDrag(anchor, evt);
+    if (this.state !== DragState.IDLE) return;
+
+    // 判断是创建还是重连
+    const existingConnection = this.store.findConnectionByAnchor(anchor.id);
+    const isReconnect = existingConnection !== undefined && !this.store.isAnchorFull(anchor.id);
+
+    if (isReconnect) {
+      this.currentExecutor = new ReConnectionDrag(this);
+    } else {
+      this.currentExecutor = new ConnectionDrag(this);
+    }
+    this.currentExecutor.start(anchor, evt);
     this.bindDragEvents();
     evt.preventDefault();
   }
@@ -112,7 +123,10 @@ export class DragManager {
       const dx = canvasPos.x - this.pendingDrag.startPos.x;
       const dy = canvasPos.y - this.pendingDrag.startPos.y;
       if (Math.sqrt(dx * dx + dy * dy) > 5) {
-        this.connectionDragManager.startDragging();
+        // 触发真正拖拽
+        if (this.currentExecutor && 'startDragging' in this.currentExecutor) {
+          (this.currentExecutor as ConnectionDrag | ReConnectionDrag).startDragging();
+        }
         this.lastMoveEvent = evt;
         if (this.rafId === null) {
           this.rafId = requestAnimationFrame(() => this.processMove());
@@ -144,13 +158,13 @@ export class DragManager {
     }
 
     if (this.state === DragState.NODE_DRAGGING && this.nodeDragData) {
-      this.nodeDragManager.endNodeDrag();
+      this.currentExecutor?.end?.(evt);
       this.unbindDragEvents();
       return;
     }
 
     if ((this.state === DragState.LINK_DRAGGING || this.state === DragState.HOVERING) && this.linkDragData) {
-      this.connectionDragManager.finishLinkDrag(evt);
+      this.currentExecutor?.end?.(evt);
       this.unbindDragEvents();
       return;
     }
@@ -166,10 +180,8 @@ export class DragManager {
     this.lastMoveEvent = null;
     const canvasPos = this.viewport.screenToCanvas({ x: evt.clientX, y: evt.clientY });
 
-    if (this.state === DragState.NODE_DRAGGING && this.nodeDragData) {
-      this.nodeDragManager.processMove(canvasPos);
-    } else if (this.state === DragState.LINK_DRAGGING && this.linkDragData) {
-      this.connectionDragManager.processMove(canvasPos);
+    if (this.currentExecutor && typeof this.currentExecutor.processMove === 'function') {
+      this.currentExecutor.processMove(canvasPos);
     }
   }
 
@@ -202,13 +214,14 @@ export class DragManager {
     if (this.linkDragData?.connectionId) {
       this.renderer.setReconnecting(this.linkDragData.connectionId, false);
     }
-    this.connectionDragManager.cancelLinkDrag();
+    this.currentExecutor?.cancel?.();
     this.renderer.clearTempLine();
     this.chart.getSvgRoot().style.cursor = '';
     this.nodeDragData = null;
     this.linkDragData = null;
     this.pendingDrag = null;
     this.state = DragState.IDLE;
+    this.currentExecutor = null;
     this.unbindDragEvents();
   }
 
