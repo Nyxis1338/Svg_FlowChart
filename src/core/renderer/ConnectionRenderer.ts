@@ -6,6 +6,7 @@ import type { Connection, LabelConfig, ArrowConfig } from '../../types/SvgModel'
 import type { Point } from '../../types/geometry';
 import { createSvgElement } from '../../utils/dom';
 import { Defaults } from '../../styles/defaults';
+import { direction } from '../../calc/geometry';
 
 export class ConnectionRenderer {
   constructor(
@@ -16,7 +17,9 @@ export class ConnectionRenderer {
 
   render(skipIds?: Set<string>): void {
     const connections = this.store.getAllConnections();
-    const sorted = [...connections].sort((a, b) => (a.zIndex ?? 100) - (b.zIndex ?? 100));
+    const sorted = [...connections].sort(
+      (a, b) => (a.zIndex ?? Defaults.zIndexBase) - (b.zIndex ?? Defaults.zIndexBase)
+    );
 
     for (const conn of sorted) {
       if (skipIds && skipIds.has(conn.id)) continue;
@@ -27,8 +30,9 @@ export class ConnectionRenderer {
       const g = createSvgElement('g') as SVGGElement;
       g.dataset['connectionId'] = conn.id;
       g.style.cursor = 'pointer';
-      g.dataset['zIndex'] = String(conn.zIndex ?? 100);
+      g.dataset['zIndex'] = String(conn.zIndex ?? Defaults.zIndexBase);
 
+      // ---- 主路径 ----
       const path = createSvgElement('path') as SVGPathElement;
       path.setAttribute('d', pathD);
       path.setAttribute('fill', 'none');
@@ -43,18 +47,24 @@ export class ConnectionRenderer {
       path.setAttribute('stroke-linejoin', Defaults.connection.strokeLinejoin);
       g.appendChild(path);
 
+      // ---- 箭头：绘制在连接器末端，方向沿连接器方向 ----
       if (conn.arrow && conn.arrow.direction !== 'none') {
         const arrow = conn.arrow;
+        // 目标端箭头：位置在 end，方向为 start→end
         if (arrow.direction === 'target' || arrow.direction === 'both') {
-          const arrowEl = this.renderArrow(arrow, rawEnd, endDirection, strokeColor);
+          const dir = direction(start, end);
+          const arrowEl = this.renderArrow(arrow, end, dir, strokeColor);
           if (arrowEl) g.appendChild(arrowEl);
         }
+        // 源端箭头：位置在 start，方向为 end→start
         if (arrow.direction === 'source' || arrow.direction === 'both') {
-          const arrowEl = this.renderArrow(arrow, rawStart, startDirection, strokeColor);
+          const dir = direction(end, start);
+          const arrowEl = this.renderArrow(arrow, start, dir, strokeColor);
           if (arrowEl) g.appendChild(arrowEl);
         }
       }
 
+      // ---- 标签 ----
       if (conn.label) {
         const labelEl = this.renderLabel(conn.label, { start, end, pathD });
         if (labelEl) g.appendChild(labelEl);
@@ -64,6 +74,9 @@ export class ConnectionRenderer {
     }
   }
 
+  /**
+   * 绘制单个箭头（三角形或三叉）
+   */
   private renderArrow(arrow: ArrowConfig, tip: Point, dir: Point, color: string): SVGPathElement | null {
     const length = arrow.length || Defaults.arrow.length;
     const width = arrow.width || Defaults.arrow.width;
@@ -74,11 +87,13 @@ export class ConnectionRenderer {
     const dx = dir.x / len;
     const dy = dir.y / len;
 
-    const halfWidth = width / 2;
+    // 底边中点
     const base = {
       x: tip.x - dx * length,
       y: tip.y - dy * length,
     };
+    // 底边两个端点（垂直于方向向量偏移 ±width/2）
+    const halfWidth = width / 2;
     const left = {
       x: base.x + dy * halfWidth,
       y: base.y - dx * halfWidth,
@@ -90,22 +105,29 @@ export class ConnectionRenderer {
 
     const arrowPath = createSvgElement('path') as SVGPathElement;
     let d = '';
+
     if (type === 'fork') {
+      // 三叉：从 base 到 left 和 right 两条线
       d += `M ${base.x.toFixed(2)} ${base.y.toFixed(2)} L ${left.x.toFixed(2)} ${left.y.toFixed(2)} `;
       d += `M ${base.x.toFixed(2)} ${base.y.toFixed(2)} L ${right.x.toFixed(2)} ${right.y.toFixed(2)} `;
       arrowPath.setAttribute('stroke', color);
       arrowPath.setAttribute('stroke-width', String(width / 3));
       arrowPath.setAttribute('fill', 'none');
     } else {
+      // 三角形：填充
       d += `M ${tip.x.toFixed(2)} ${tip.y.toFixed(2)} L ${left.x.toFixed(2)} ${left.y.toFixed(2)} L ${right.x.toFixed(2)} ${right.y.toFixed(2)} Z`;
       arrowPath.setAttribute('fill', color);
       arrowPath.setAttribute('stroke', 'none');
     }
     arrowPath.setAttribute('d', d.trim());
     arrowPath.setAttribute('pointer-events', 'none');
+
     return arrowPath;
   }
 
+  /**
+   * 渲染文字标签
+   */
   private renderLabel(
     label: LabelConfig,
     pathInfo: { start: Point; end: Point; pathD: string }

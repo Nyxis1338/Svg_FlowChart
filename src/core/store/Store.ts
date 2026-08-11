@@ -277,7 +277,7 @@ export class Store {
 
   // ---- z-index ----
   private getMaxZIndex(): number {
-    let max = 99; // 初始值
+    let max = Defaults.zIndexBase - 1;
     for (const node of this.nodes.values()) {
       if (node.zIndex !== undefined && node.zIndex > max) max = node.zIndex;
     }
@@ -320,7 +320,7 @@ export class Store {
     for (const conn of this.connections.values()) {
       if (conn.zIndex !== undefined && conn.zIndex < min) min = conn.zIndex;
     }
-    return min === Infinity ? 100 : min;
+    return min === Infinity ? Defaults.zIndexBase : min;
   }
 }
 

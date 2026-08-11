@@ -105,7 +105,6 @@
     </script>
     <script type="module">
       import { SvgEngine } from '../../src/core/SvgEngine';
-      import { NodeShape, AnchorPosition, AnchorType, ConnectorType, ArrowDirection } from '../../src/types/SvgModel';
 
       const container = document.getElementById('container');
       const chart = new SvgEngine(container);
@@ -133,7 +132,7 @@
       });
       chart.addAnchor({
         nodeId: nodeA.id,
-        type: AnchorType.STATIC,
+
         position: 'right',
         direction: 'output',
         radius: 6,
@@ -153,7 +152,7 @@
       });
       chart.addAnchor({
         nodeId: nodeB.id,
-        type: AnchorType.STATIC,
+
         position: 'left',
         direction: 'input',
         radius: 6,
@@ -173,7 +172,7 @@
           strokeWidth: 3,
           stub: 10,
           gap: 0,
-          arrow: { direction: ArrowDirection.TARGET, length: 14 },
+          arrow: { direction: 'target', length: 14 },
         });
       }
 
@@ -279,10 +278,6 @@
         const tipAngle = (2 * Math.atan2(width / 2, length) * 180) / Math.PI;
         console.log('箭头顶角（度）:', tipAngle.toFixed(2));
 
-        // 如果使用了 angle 参数，打印该角度
-        if (arrow.angle !== undefined) {
-          console.log('指定顶角（度）:', arrow.angle);
-        }
         console.groupEnd();
       };
 

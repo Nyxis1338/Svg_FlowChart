@@ -4,7 +4,6 @@ import type { SvgEngine } from '../SvgEngine';
 import type { ViewportManager } from '../viewport/ViewportManager';
 import { LayerManager } from './LayerManager';
 import { NodeRenderer } from './NodeRenderer';
-import { AnchorRenderer } from './AnchorRenderer';
 import { ConnectionRenderer } from './ConnectionRenderer';
 import type { SelectionManager } from '../selection/SelectionManager';
 import { TempLineManager } from './TempLineManager';
@@ -17,7 +16,6 @@ export class SvgRenderer {
 
   private layerManager: LayerManager;
   private nodeRenderer: NodeRenderer;
-  private anchorRenderer: AnchorRenderer;
   private connectionRenderer: ConnectionRenderer;
   private tempLineManager: TempLineManager;
 
@@ -32,7 +30,6 @@ export class SvgRenderer {
     this.layerManager = new LayerManager(this.viewport.getContentGroup());
 
     this.nodeRenderer = new NodeRenderer(this.chart.store, this.selection, this.layerManager.elementLayer);
-    this.anchorRenderer = new AnchorRenderer(this.chart.store, this.layerManager.elementLayer);
     this.connectionRenderer = new ConnectionRenderer(this.chart.store, this.selection, this.layerManager.elementLayer);
     this.tempLineManager = new TempLineManager(this.layerManager.tempLayer);
 
@@ -47,8 +44,7 @@ export class SvgRenderer {
       this.layerManager.elementLayer.appendChild(tempNode);
     }
     this.connectionRenderer.render(this.reconnectingIds);
-    this.anchorRenderer.render();
-    this.nodeRenderer.render();
+    this.nodeRenderer.render(); // 同时渲染节点和锚点
   }
 
   setReconnecting(connId: string, isReconnecting: boolean): void {
@@ -77,7 +73,7 @@ export class SvgRenderer {
   }
 
   highlightAnchor(anchorId: string, highlight: boolean): void {
-    this.anchorRenderer.highlightAnchor(anchorId, highlight);
+    this.nodeRenderer.highlightAnchor(anchorId, highlight);
   }
 
   destroy(): void {

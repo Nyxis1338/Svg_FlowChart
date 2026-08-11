@@ -84,6 +84,9 @@ export const Defaults = {
     offsetY: -10,
     fontFamily: 'sans-serif',
   },
+
+  /** z-index 基础值（新元素从该值开始分配） */
+  zIndexBase: 100,
 } as const;
 
 /** 预设连线颜色（8种优雅色） */
