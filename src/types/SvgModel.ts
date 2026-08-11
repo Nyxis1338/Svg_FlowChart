@@ -2,50 +2,21 @@
 
 import type { Point, Rect } from './geometry';
 
-// ==================== 枚举定义 ====================
+// ==================== 类型定义 ====================
 
-/** 节点形状 */
-export enum NodeShape {
-  RECTANGLE = 'rectangle',
-  CIRCLE = 'circle',
-  DIAMOND = 'diamond',
-  ELLIPSE = 'ellipse',
-}
-
-/** 锚点类型 */
-export enum AnchorType {
-  /** 静态锚点：在节点特定位置（上/右/下/左等）固定，可见 */
-  STATIC = 'static',
-  /** 连续锚点：沿节点边缘动态计算，不可见但可交互 */
-  CONTINUOUS = 'continuous', // 原 CONTINUOUS 改为此名
-}
-
+export type NodeShape = 'rectangle' | 'circle' | 'diamond' | 'ellipse';
+export type ArrowDirection = 'none' | 'source' | 'target' | 'both';
+export type ConnectorType = 'straight' | 'bezier' | 'flowchart';
 /** 静态锚点的位置（8个方向） */
-export enum AnchorPosition {
-  TOP_LEFT = 'top-left',
-  TOP = 'top',
-  TOP_RIGHT = 'top-right',
-  RIGHT = 'right',
-  BOTTOM_RIGHT = 'bottom-right',
-  BOTTOM = 'bottom',
-  BOTTOM_LEFT = 'bottom-left',
-  LEFT = 'left',
-}
-
-/** 箭头方向 */
-export enum ArrowDirection {
-  NONE = 'none',
-  SOURCE = 'source',
-  TARGET = 'target',
-  BOTH = 'both',
-}
-
-/** 连线类型 */
-export enum ConnectorType {
-  STRAIGHT = 'straight',
-  BEZIER = 'bezier',
-  FLOWCHART = 'flowchart',
-}
+export type AnchorPosition =
+  | 'top'
+  | 'right'
+  | 'left'
+  | 'bottom'
+  | 'top-left'
+  | 'top-right'
+  | 'bottom-left'
+  | 'bottom-right';
 
 // ==================== 标签和箭头配置 ====================
 
@@ -58,10 +29,11 @@ export interface LabelConfig {
 
 export interface ArrowConfig {
   direction?: ArrowDirection;
+  type?: 'fork' | 'triangle'; // 新增
   length?: number;
   width?: number;
   color?: string;
-  foldback?: number;
+  foldback?: number; // 仅 triangle 可用
 }
 
 // ==================== 实体接口 ====================
@@ -86,16 +58,13 @@ export interface Node {
 export interface Anchor {
   id: string;
   nodeId: string;
-  type: AnchorType;
-  position?: AnchorPosition; // 仅 STATIC 有效
-  direction: 'input' | 'output' | 'both'; // 增加 both
+  position?: AnchorPosition;
+  direction: 'input' | 'output' | 'both';
   radius?: number;
   fill?: string;
   stroke?: string;
   strokeWidth?: string;
   offset?: Point;
-  perimeterTotal?: number; // 仅 CONTINUOUS 有效
-  perimeterIndex?: number; // 仅 CONTINUOUS 有效
   visible?: boolean;
   data?: Record<string, unknown>;
 }
@@ -105,8 +74,6 @@ export interface Connection {
   connectorType: ConnectorType;
   sourceAnchorId?: string;
   targetAnchorId?: string;
-  sourceNodeId?: string;
-  targetNodeId?: string;
   stroke?: string;
   strokeWidth?: number;
   label?: LabelConfig;
@@ -116,28 +83,4 @@ export interface Connection {
   stub?: number;
   gap?: number;
   zIndex?: number;
-}
-
-// ==================== 容器与视图状态 ====================
-
-export interface ContainerConfig {
-  id: string;
-  background?: string;
-  minZoom?: number;
-  maxZoom?: number;
-  initialZoom?: number;
-}
-
-export interface ViewState {
-  translateX: number;
-  translateY: number;
-  scale: number;
-}
-
-export interface SvgDataModel {
-  nodes: Record<string, Node>;
-  connections: Record<string, Connection>;
-  anchors: Record<string, Anchor>;
-  viewState: ViewState;
-  containerConfig: ContainerConfig;
 }

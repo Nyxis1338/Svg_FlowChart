@@ -7,12 +7,7 @@ import type { ViewportManager } from '../viewport/ViewportManager';
 import type { SvgRenderer } from '../renderer/SvgRenderer';
 import type { SelectionManager } from '../selection/SelectionManager';
 import type { DragManager } from './DragManager';
-import { DragState } from './DragManager';
 
-/**
- * 节点拖拽执行器
- * 处理节点拖拽的完整生命周期
- */
 export class NodeDrag {
   private readonly dragManager: DragManager;
   private readonly chart: SvgEngine;
@@ -35,9 +30,6 @@ export class NodeDrag {
     return this.chart.renderer;
   }
 
-  /**
-   * 启动节点拖拽
-   */
   start(evt: MouseEvent): void {
     if (this.dragManager.state !== 'idle') return;
 
@@ -61,12 +53,9 @@ export class NodeDrag {
       offset: { x: canvasPos.x - node.x, y: canvasPos.y - node.y },
     };
     this.selection.select('node', nodeId);
-    this.dragManager.state = DragState.NODE_DRAGGING;
+    this.dragManager.state = 'node_dragging';
   }
 
-  /**
-   * 处理节点拖拽的移动更新
-   */
   processMove(canvasPos: Point): boolean {
     const data = this.dragManager.nodeDragData;
     if (!data) return false;
@@ -78,21 +67,15 @@ export class NodeDrag {
     return true;
   }
 
-  /**
-   * 结束节点拖拽
-   */
   end(_evt?: MouseEvent): void {
     const data = this.dragManager.nodeDragData;
     if (!data) return;
 
     this.selection.select('node', data.nodeId);
     this.dragManager.nodeDragData = null;
-    this.dragManager.state = DragState.IDLE;
+    this.dragManager.state = 'idle';
   }
 
-  /**
-   * 取消节点拖拽
-   */
   cancel(): void {
     this.dragManager.nodeDragData = null;
   }

@@ -11,16 +11,12 @@ import { NodeDrag } from './NodeDrag';
 import { ConnectionDrag } from './ConnectionDrag';
 import { ReConnectionDrag } from './ReConnectionDrag';
 
-export enum DragState {
-  IDLE = 'idle',
-  NODE_DRAGGING = 'node_dragging',
-  LINK_DRAGGING = 'link_dragging',
-  HOVERING = 'hovering',
-}
+// 使用字符串字面量类型替代枚举
+export type DragState = 'idle' | 'node_dragging' | 'link_dragging' | 'hovering';
 
 export class DragManager {
   // 共享状态（由子执行器直接读写）
-  public state: DragState = DragState.IDLE;
+  public state: DragState = 'idle';
   public nodeDragData: { nodeId: string; offset: Point } | null = null;
   public linkDragData: {
     sourceAnchorId: string;
@@ -57,7 +53,7 @@ export class DragManager {
   private currentExecutor: NodeDrag | ConnectionDrag | ReConnectionDrag | null = null;
 
   public get isDragging(): boolean {
-    return this.state !== DragState.IDLE;
+    return this.state !== 'idle';
   }
 
   constructor(chart: SvgEngine) {
@@ -67,7 +63,7 @@ export class DragManager {
   // ==================== 公共入口 ====================
 
   public startNodeDrag(evt: MouseEvent): void {
-    if (this.state !== DragState.IDLE) return;
+    if (this.state !== 'idle') return;
     this.currentExecutor = new NodeDrag(this);
     this.currentExecutor.start(evt);
     this.bindDragEvents();
@@ -75,9 +71,7 @@ export class DragManager {
   }
 
   public startLinkDrag(anchor: Anchor, evt: MouseEvent): void {
-    if (this.state !== DragState.IDLE) return;
-
-    // 判断是创建还是重连
+    if (this.state !== 'idle') return;
     const existingConnection = this.store.findConnectionByAnchor(anchor.id);
     const isReconnect = existingConnection !== undefined && !this.store.isAnchorFull(anchor.id);
 
@@ -123,7 +117,6 @@ export class DragManager {
       const dx = canvasPos.x - this.pendingDrag.startPos.x;
       const dy = canvasPos.y - this.pendingDrag.startPos.y;
       if (Math.sqrt(dx * dx + dy * dy) > 5) {
-        // 触发真正拖拽
         if (this.currentExecutor && 'startDragging' in this.currentExecutor) {
           (this.currentExecutor as ConnectionDrag | ReConnectionDrag).startDragging();
         }
@@ -157,13 +150,13 @@ export class DragManager {
       this.rafId = null;
     }
 
-    if (this.state === DragState.NODE_DRAGGING && this.nodeDragData) {
+    if (this.state === 'node_dragging' && this.nodeDragData) {
       this.currentExecutor?.end?.(evt);
       this.unbindDragEvents();
       return;
     }
 
-    if ((this.state === DragState.LINK_DRAGGING || this.state === DragState.HOVERING) && this.linkDragData) {
+    if ((this.state === 'link_dragging' || this.state === 'hovering') && this.linkDragData) {
       this.currentExecutor?.end?.(evt);
       this.unbindDragEvents();
       return;
@@ -220,7 +213,7 @@ export class DragManager {
     this.nodeDragData = null;
     this.linkDragData = null;
     this.pendingDrag = null;
-    this.state = DragState.IDLE;
+    this.state = 'idle';
     this.currentExecutor = null;
     this.unbindDragEvents();
   }

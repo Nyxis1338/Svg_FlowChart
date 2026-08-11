@@ -7,7 +7,6 @@ import { DragManager } from './interaction/DragManager';
 import { SvgRenderer } from './renderer/SvgRenderer';
 import type { Node, Connection, Anchor } from '../types/SvgModel';
 import type { Point } from '../types/geometry';
-import { AnchorType } from '../types/SvgModel';
 import { EventBus } from './interaction/EventBus';
 import { ContextMenu } from './interaction/ContextMenu';
 
@@ -34,7 +33,7 @@ export class SvgEngine {
     this.dragManager = new DragManager(this);
     this.renderer = new SvgRenderer(this);
     this.contextMenu = new ContextMenu(this, this.store, this.selection);
-    this.eventBus = new EventBus(this); // ✅ EventBus 需要访问 contextMenu，因此放在后面
+    this.eventBus = new EventBus(this);
   }
 
   private addDefs(svg: SVGSVGElement): void {
@@ -67,10 +66,8 @@ export class SvgEngine {
   }
 
   // ==================== 节点操作 ====================
-  /** 添加纯节点（不自动生成锚点） */
   addNode(data: Omit<Node, 'id'>): Node {
     const id = `node-${crypto.randomUUID()}`;
-
     const node: Node = { id, ...data };
     return this.store.addNode(node);
   }
@@ -94,7 +91,6 @@ export class SvgEngine {
   // ==================== 连线操作 ====================
   addConnection(data: Omit<Connection, 'id'>): Connection {
     const id = `connect-${crypto.randomUUID()}`;
-
     const conn: Connection = { id, ...data };
     return this.store.addConnection(conn);
   }
@@ -117,13 +113,8 @@ export class SvgEngine {
 
   // ==================== 锚点操作 ====================
   addAnchor(data: Omit<Anchor, 'id'>): Anchor {
-    const anchorData = { ...data };
-    if (anchorData.type === AnchorType.CONTINUOUS) {
-      anchorData.direction = 'both';
-    }
     const id = `anchor-${crypto.randomUUID()}`;
-
-    const anchor: Anchor = { id, ...anchorData };
+    const anchor: Anchor = { id, ...data };
     return this.store.addAnchor(anchor);
   }
 
@@ -144,70 +135,40 @@ export class SvgEngine {
   }
 
   // ==================== 批量更新 ====================
-
-  /**
-   * 更新所有节点的样式或属性
-   * @param updates 节点属性的部分更新对象（忽略不存在的属性）
-   */
   updateAllNodes(updates: Partial<Node>): void {
     this.store.updateAllNodes(updates);
   }
 
-  /**
-   * 更新所有连线的样式或属性
-   * @param updates 连线属性的部分更新对象（忽略不存在的属性）
-   */
   updateAllConnections(updates: Partial<Connection>): void {
     this.store.updateAllConnections(updates);
   }
 
-  /**
-   * 更新所有锚点的样式或属性
-   * @param updates 锚点属性的部分更新对象（忽略不存在的属性）
-   */
   updateAllAnchors(updates: Partial<Anchor>): void {
     this.store.updateAllAnchors(updates);
   }
 
   // ==================== 视图操作 ====================
-
-  /**
-   * 放大（默认增加 0.1）
-   */
   zoomIn(factor: number = 0.1): void {
     const currentScale = this.viewport.getScale();
     const newScale = Math.min(currentScale + factor, 3);
     this.viewport.setTransform(this.viewport.getTranslate().x, this.viewport.getTranslate().y, newScale);
   }
 
-  /**
-   * 缩小（默认减少 0.1）
-   */
   zoomOut(factor: number = 0.1): void {
     const currentScale = this.viewport.getScale();
     const newScale = Math.max(currentScale - factor, 0.3);
     this.viewport.setTransform(this.viewport.getTranslate().x, this.viewport.getTranslate().y, newScale);
   }
 
-  /**
-   * 缩放到指定比例
-   */
   zoomTo(scale: number): void {
     const clamped = Math.max(0.3, Math.min(3, scale));
     this.viewport.setTransform(this.viewport.getTranslate().x, this.viewport.getTranslate().y, clamped);
   }
 
-  /**
-   * 重置视图（平移到原点，缩放为 1）
-   */
   resetView(): void {
     this.viewport.setTransform(0, 0, 1);
   }
 
-  /**
-   * 将所有节点适配到可视区域（居中显示，并适当缩放）
-   * @param padding 边距（默认 50）
-   */
   fitToView(padding: number = 50): void {
     const nodes = this.store.getAllNodes();
     if (nodes.length === 0) {
@@ -263,7 +224,7 @@ export class SvgEngine {
     this.dragManager.destroy();
     this.renderer.destroy();
     this.viewport.destroy();
-    this.contextMenu.destroy(); // ✅ 新增
+    this.contextMenu.destroy();
     this.svgRoot.remove();
   }
 }

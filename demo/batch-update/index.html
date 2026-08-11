@@ -141,7 +141,7 @@
     </script>
     <script type="module">
       import { SvgEngine } from '../../src/core/SvgEngine';
-      import { NodeShape, AnchorPosition, AnchorType, ConnectorType, ArrowDirection } from '../../src/types/SvgModel';
+      import { NodeShape } from '../../src/types/SvgModel';
       import { ConnectorColors } from '../../src/styles/defaults';
 
       const container = document.getElementById('canvas-wrap');
@@ -163,29 +163,25 @@
       function addDefaultAnchors(nodeId) {
         chart.addAnchor({
           nodeId,
-          type: AnchorType.STATIC,
-          position: AnchorPosition.TOP,
+          position: 'top',
           direction: 'output',
           radius: 5,
         });
         chart.addAnchor({
           nodeId,
-          type: AnchorType.STATIC,
-          position: AnchorPosition.RIGHT,
+          position: 'right',
           direction: 'output',
           radius: 5,
         });
         chart.addAnchor({
           nodeId,
-          type: AnchorType.STATIC,
-          position: AnchorPosition.BOTTOM,
+          position: 'bottom',
           direction: 'input',
           radius: 5,
         });
         chart.addAnchor({
           nodeId,
-          type: AnchorType.STATIC,
-          position: AnchorPosition.LEFT,
+          position: 'left',
           direction: 'input',
           radius: 5,
         });
@@ -197,7 +193,7 @@
         width: 140,
         height: 90,
         label: '节点 A',
-        shape: NodeShape.RECTANGLE,
+        shape: 'rectangle',
       });
       addDefaultAnchors(nodeA.id);
 
@@ -207,7 +203,7 @@
         width: 140,
         height: 90,
         label: '节点 B',
-        shape: NodeShape.RECTANGLE,
+        shape: 'rectangle',
       });
       addDefaultAnchors(nodeB.id);
 
@@ -217,16 +213,16 @@
         width: 140,
         height: 90,
         label: '节点 C',
-        shape: NodeShape.DIAMOND,
+        shape: 'diamond',
       });
       addDefaultAnchors(nodeC.id);
 
       // ---------- 创建连线（带箭头和标签） ----------
-      const aRight = store.getNodeAnchors(nodeA.id).find(a => a.position === AnchorPosition.RIGHT);
-      const bLeft = store.getNodeAnchors(nodeB.id).find(a => a.position === AnchorPosition.LEFT);
+      const aRight = store.getNodeAnchors(nodeA.id).find(a => a.position === 'right');
+      const bLeft = store.getNodeAnchors(nodeB.id).find(a => a.position === 'left');
       if (aRight && bLeft) {
         chart.addConnection({
-          connectorType: ConnectorType.BEZIER,
+          connectorType: 'bezier',
           sourceAnchorId: aRight.id,
           targetAnchorId: bLeft.id,
           stroke: ConnectorColors[0],
@@ -236,11 +232,11 @@
         });
       }
 
-      const aBottom = store.getNodeAnchors(nodeA.id).find(a => a.position === AnchorPosition.BOTTOM);
-      const cTop = store.getNodeAnchors(nodeC.id).find(a => a.position === AnchorPosition.TOP);
+      const aBottom = store.getNodeAnchors(nodeA.id).find(a => a.position === 'bottom');
+      const cTop = store.getNodeAnchors(nodeC.id).find(a => a.position === 'top');
       if (aBottom && cTop) {
         chart.addConnection({
-          connectorType: ConnectorType.FLOWCHART,
+          connectorType: 'flowchart',
           sourceAnchorId: aBottom.id,
           targetAnchorId: cTop.id,
           stroke: ConnectorColors[1],
@@ -251,11 +247,11 @@
         });
       }
 
-      const bRight = store.getNodeAnchors(nodeB.id).find(a => a.position === AnchorPosition.RIGHT);
-      const cBottom = store.getNodeAnchors(nodeC.id).find(a => a.position === AnchorPosition.BOTTOM);
+      const bRight = store.getNodeAnchors(nodeB.id).find(a => a.position === 'right');
+      const cBottom = store.getNodeAnchors(nodeC.id).find(a => a.position === 'bottom');
       if (bRight && cBottom) {
         chart.addConnection({
-          connectorType: ConnectorType.STRAIGHT,
+          connectorType: 'straight',
           sourceAnchorId: bRight.id,
           targetAnchorId: cBottom.id,
           stroke: ConnectorColors[2],
@@ -380,7 +376,7 @@
 
         // 随机连线类型（直线 | 贝塞尔 | Flowchart）
         const randomConnectorType = () => {
-          const types = [ConnectorType.STRAIGHT, ConnectorType.BEZIER, ConnectorType.FLOWCHART];
+          const types = ['straight', 'bezier', 'flowchart'];
           return types[Math.floor(Math.random() * types.length)];
         };
 
@@ -404,11 +400,7 @@
 
         chart.updateConnection(sel.id, patch);
         const typeName =
-          patch.connectorType === ConnectorType.STRAIGHT
-            ? '直线'
-            : patch.connectorType === ConnectorType.BEZIER
-              ? '贝塞尔'
-              : 'Flowchart';
+          patch.connectorType === 'straight' ? '直线' : patch.connectorType === 'bezier' ? '贝塞尔' : 'Flowchart';
         log(`🎲 连线 ${sel.id} 已随机更新样式 (类型: ${typeName})`, true);
       });
       document.getElementById('reset-all').addEventListener('click', () => {

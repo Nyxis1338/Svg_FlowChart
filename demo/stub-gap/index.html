@@ -2,7 +2,7 @@
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
-    <title>gap + stub 垂直引出与绕行调试</title>
+    <title>Stub 垂直引出测试（直线模式）</title>
     <style>
       * {
         margin: 0;
@@ -23,6 +23,7 @@
         gap: 12px;
         flex-wrap: wrap;
         margin-bottom: 16px;
+        align-items: center;
       }
       .toolbar button {
         padding: 6px 16px;
@@ -76,19 +77,28 @@
         background: #e74c3c;
         color: #fff;
       }
+      .info {
+        margin-left: 20px;
+        font-size: 13px;
+        color: #555;
+        background: #fff;
+        padding: 4px 12px;
+        border-radius: 4px;
+        border: 1px solid #ddd;
+      }
     </style>
   </head>
   <body>
-    <h2>🔧 gap + stub 垂直引出与绕行调试</h2>
+    <h2>🧪 Stub 垂直引出测试（直线模式）</h2>
     <div class="toolbar">
       <button id="btn-stub" class="active">显示 stub</button>
       <button id="btn-gap">显示 gap</button>
-      <button id="btn-detour">启用绕行</button>
       <button id="btn-reset">重置节点位置</button>
       <span id="status-badge" style="margin-left: auto"><span class="status ok">✅ 正常</span></span>
+      <span class="info" id="coord-info">A: (?,?) B: (?,?)</span>
     </div>
     <div id="container"></div>
-    <div id="log">初始化... 拖拽节点可观察 stub 方向</div>
+    <div id="log">初始化... 拖动节点观察 stub 是否沿法线垂直引出（红线段）</div>
 
     <script type="importmap">
       { "imports": { "svg-flowchart": "../../src/" } }
@@ -103,27 +113,28 @@
       const store = chart.store;
       const logEl = document.getElementById('log');
       const statusBadge = document.getElementById('status-badge');
+      const coordInfo = document.getElementById('coord-info');
 
       function log(msg) {
         logEl.textContent = msg;
         console.log(msg);
       }
 
-      // ---- 创建两个矩形节点（左右排列） ----
+      // ---- 创建两个矩形节点：A 在 B 的左上方 ----
       const nodeA = chart.addNode({
-        x: 120,
-        y: 200,
+        x: 100,
+        y: 100,
         width: 140,
         height: 90,
         label: 'A',
-        shape: NodeShape.RECTANGLE,
+        shape: 'rectangle',
         stroke: '#7b1fa2',
         strokeWidth: 3,
       });
       chart.addAnchor({
         nodeId: nodeA.id,
         type: AnchorType.STATIC,
-        position: AnchorPosition.RIGHT,
+        position: 'right',
         direction: 'output',
         radius: 6,
         fill: '#ffffff',
@@ -131,77 +142,151 @@
       });
 
       const nodeB = chart.addNode({
-        x: 440,
-        y: 200,
+        x: 380,
+        y: 250,
         width: 140,
         height: 90,
         label: 'B',
-        shape: NodeShape.RECTANGLE,
+        shape: 'rectangle',
         stroke: '#7b1fa2',
         strokeWidth: 3,
       });
       chart.addAnchor({
         nodeId: nodeB.id,
         type: AnchorType.STATIC,
-        position: AnchorPosition.LEFT,
+        position: 'left',
         direction: 'input',
         radius: 6,
         fill: '#e8f5e9',
         stroke: '#43a047',
       });
 
-      // ---- 创建连线（使用流程图类型，stub=40, gap=5） ----
-      const aRight = store.getNodeAnchors(nodeA.id).find(a => a.position === AnchorPosition.RIGHT);
-      const bLeft = store.getNodeAnchors(nodeB.id).find(a => a.position === AnchorPosition.LEFT);
+      // ---- 创建连线（直线类型，stub=40，gap=0） ----
+      const aRight = store.getNodeAnchors(nodeA.id).find(a => a.position === 'right');
+      const bLeft = store.getNodeAnchors(nodeB.id).find(a => a.position === 'left');
       if (aRight && bLeft) {
         chart.addConnection({
-          connectorType: ConnectorType.FLOWCHART,
+          connectorType: 'straight',
           sourceAnchorId: aRight.id,
           targetAnchorId: bLeft.id,
           stroke: '#e74c3c',
           strokeWidth: 3,
-          stub: 40,
-          gap: 5,
+          stub: 10,
+          gap: 0,
           arrow: { direction: ArrowDirection.TARGET, length: 14 },
         });
       }
 
-      log('✅ 就绪。拖动节点 A 或 B，观察 stub 是否垂直引出且不穿入节点。');
+      // ---- 更新坐标显示 ----
+      function updateCoordInfo() {
+        const a = chart.store.getNode(nodeA.id);
+        const b = chart.store.getNode(nodeB.id);
+        coordInfo.textContent = `A: (${Math.round(a.x)}, ${Math.round(a.y)})  B: (${Math.round(b.x)}, ${Math.round(b.y)})`;
+      }
+      updateCoordInfo();
 
-      // ---- 按钮事件 ----
-      document.getElementById('btn-stub').addEventListener('click', function () {
-        this.classList.toggle('active');
-        log('stub 显示已切换');
-      });
-      document.getElementById('btn-gap').addEventListener('click', function () {
-        this.classList.toggle('active');
-        log('gap 显示已切换');
-      });
-      document.getElementById('btn-detour').addEventListener('click', function () {
-        this.classList.toggle('active');
-        const enabled = this.classList.contains('active');
-        // 这里可以调用 chart.setDetourEnabled(enabled) 未来实现
-        log(`绕行 ${enabled ? '启用' : '禁用'}`);
-        statusBadge.innerHTML = enabled
-          ? '<span class="status ok">✅ 绕行启用</span>'
-          : '<span class="status err">⛔ 绕行禁用</span>';
-      });
-      document.getElementById('btn-reset').addEventListener('click', () => {
-        chart.updateNode(nodeA.id, { x: 120, y: 200 });
-        chart.updateNode(nodeB.id, { x: 440, y: 200 });
-        log('节点位置已重置');
-      });
-
-      // 监听节点移动，输出法线信息
+      // 监听节点移动
       chart.store.subscribe(() => {
+        updateCoordInfo();
         const conn = store.getAllConnections()[0];
         if (conn) {
           const pathInfo = store.computeConnectionPath(conn);
           if (pathInfo) {
-            console.log('起点:', pathInfo.start, '终点:', pathInfo.end);
+            console.log('起点（stub端点）:', pathInfo.start, '终点（stub端点）:', pathInfo.end);
           }
         }
       });
+
+      log('✅ 就绪。拖动节点 A 或 B，观察红色 stub 是否垂直引出（从右锚点水平向右，左锚点水平向左）。');
+
+      // ---- 按钮事件 ----
+      document.getElementById('btn-stub').addEventListener('click', function () {
+        this.classList.toggle('active');
+        log('stub 显示已切换（仅演示，实际始终显示）');
+      });
+      document.getElementById('btn-gap').addEventListener('click', function () {
+        this.classList.toggle('active');
+        log('gap 显示已切换（gap 当前为 0）');
+      });
+      document.getElementById('btn-reset').addEventListener('click', () => {
+        chart.updateNode(nodeA.id, { x: 100, y: 100 });
+        chart.updateNode(nodeB.id, { x: 380, y: 250 });
+        log('节点位置已重置');
+        updateCoordInfo();
+      });
+
+      // ---- 控制台辅助（方便查看锚点坐标） ----
+      window.getAnchorCoords = function () {
+        const aRight2 = store.getNodeAnchors(nodeA.id).find(a => a.position === 'right');
+        const bLeft2 = store.getNodeAnchors(nodeB.id).find(a => a.position === 'left');
+        const aNode = store.getNode(nodeA.id);
+        const bNode = store.getNode(nodeB.id);
+        const rawA = store.calcAnchorPosForNode(aNode, aRight2);
+        const rawB = store.calcAnchorPosForNode(bNode, bLeft2);
+        console.log('A 右锚点原始坐标:', rawA);
+        console.log('B 左锚点原始坐标:', rawB);
+        const conn = store.getAllConnections()[0];
+        if (conn) {
+          const pathInfo = store.computeConnectionPath(conn);
+          console.log('偏移后起点（stub端点）:', pathInfo.start);
+          console.log('偏移后终点（stub端点）:', pathInfo.end);
+        }
+      };
+      console.log('💡 在控制台执行 getAnchorCoords() 可查看原始锚点和 stub 端点坐标');
+
+      // ---- 挂载到全局，便于调试 ----
+      window.getArrowInfo = function (connId) {
+        const conn = connId ? store.getConnection(connId) : store.getAllConnections()[0];
+        if (!conn) {
+          console.warn('未找到连线');
+          return;
+        }
+        const arrow = conn.arrow;
+        if (!arrow || arrow.direction === 'none') {
+          console.warn('该连线没有箭头');
+          return;
+        }
+        const pathInfo = store.computeConnectionPath(conn);
+        if (!pathInfo) {
+          console.warn('无法计算路径');
+          return;
+        }
+        const { startDirection, endDirection, start, end } = pathInfo;
+
+        console.group('箭头信息');
+        console.log('连线 ID:', conn.id);
+        console.log('箭头配置:', arrow);
+        console.log('起点:', start);
+        console.log('终点:', end);
+
+        // 根据方向选择对应的方向向量
+        const dir = arrow.direction === 'target' ? endDirection : arrow.direction === 'source' ? startDirection : null;
+        if (!dir) {
+          console.warn('方向向量为空');
+          console.groupEnd();
+          return;
+        }
+        const angleDeg = (Math.atan2(dir.y, dir.x) * 180) / Math.PI;
+        console.log('方向向量:', dir);
+        console.log('方向角度（度）:', angleDeg);
+
+        // 计算实际尺寸
+        const length = arrow.length || Defaults.arrow.length;
+        const width = arrow.width || Defaults.arrow.width;
+        console.log('箭头长度:', length);
+        console.log('箭头宽度:', width);
+        // 顶角 = 2 * atan(width/(2*length))
+        const tipAngle = (2 * Math.atan2(width / 2, length) * 180) / Math.PI;
+        console.log('箭头顶角（度）:', tipAngle.toFixed(2));
+
+        // 如果使用了 angle 参数，打印该角度
+        if (arrow.angle !== undefined) {
+          console.log('指定顶角（度）:', arrow.angle);
+        }
+        console.groupEnd();
+      };
+
+      console.log('💡 在控制台执行 getArrowInfo() 可查看第一条连线的箭头信息，传入连线ID可查看指定连线');
     </script>
   </body>
 </html>

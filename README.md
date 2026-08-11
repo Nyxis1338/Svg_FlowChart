@@ -26,9 +26,11 @@ cd Svg_FlowChart
 npm install
 npm run dev
 ```
+
 浏览器访问 http://localhost:5173 即可看到测试页面。
 
 项目结构及文件说明
+
 ```
 Svg_FlowChart/
 ├── index.html                # 测试页面，包含工具栏与画布容器
@@ -85,6 +87,7 @@ Svg_FlowChart/
 ```
 
 ### 核心数据模型（SvgModel.ts 简览）
+
 Node：节点，包含位置、尺寸、形状、样式、标签、锚点 ID 列表。
 
 Anchor：锚点（端点），分为 static（固定位置）和 perimeter（连续动态）。static 锚点可见，perimeter 锚点透明但可交互。
@@ -92,6 +95,7 @@ Anchor：锚点（端点），分为 static（固定位置）和 perimeter（连
 Connection：连线，包含类型（straight/bezier/flowchart）、源/目标锚点 ID（或节点 ID 用于连续锚点）、样式、标签配置、箭头配置。
 
 ### 常用 API（通过 SvgEngine 实例调用）
+
 ```
 const chart = new SvgEngine(container);
 
@@ -131,16 +135,18 @@ chart.destroy();
 ```
 
 ### 操作快捷键
-|操作 |说明|
-|----|----|
-|空格 + 鼠标左键拖拽 |	平移画布|
-|鼠标滚轮 |	缩放画布|
-|左键拖拽节点 |	移动节点|
-|从锚点拖拽 |	创建连线（拖到另一锚点释放）|
-|Delete / Backspace |	删除选中的节点或连线|
-|ESC	|取消当前拖拽操作|
+
+| 操作                | 说明                         |
+| ------------------- | ---------------------------- |
+| 空格 + 鼠标左键拖拽 | 平移画布                     |
+| 鼠标滚轮            | 缩放画布                     |
+| 左键拖拽节点        | 移动节点                     |
+| 从锚点拖拽          | 创建连线（拖到另一锚点释放） |
+| Delete / Backspace  | 删除选中的节点或连线         |
+| ESC                 | 取消当前拖拽操作             |
 
 ### 开发计划
+
 □ 支持撤销/重做（Undo/Redo）
 □ 支持多选与框选
 □ 连线路径优化（避免穿越节点）
@@ -148,6 +154,7 @@ chart.destroy();
 □ 主题定制（颜色/字体）
 
 ### 技术栈
+
 Vite（构建工具）
 
 TypeScript（类型安全）
@@ -155,9 +162,8 @@ TypeScript（类型安全）
 原生 SVG（无第三方绘图库）
 
 ### License
+
 MIT
-
-
 
 ```
 Svg_FlowChart

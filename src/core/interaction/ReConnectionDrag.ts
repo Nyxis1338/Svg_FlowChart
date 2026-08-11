@@ -9,17 +9,11 @@ import type { SelectionManager } from '../selection/SelectionManager';
 import type { Anchor, Connection } from '../../types/SvgModel';
 import { Defaults } from '../../styles/defaults';
 import { HitTest } from './HitTest';
-import { ConnectorType, AnchorType } from '../../types/SvgModel';
-import { getContinuousAnchorPosition } from '../../calc/anchor/continuous';
-import { getAnchorOrientation } from '../../utils/anchor-helpers';
+import { ConnectorType } from '../../types/SvgModel';
+import { getAnchorOrientation } from '../../calc/anchor/orientation';
 import { isDirectionCompatible } from '../../utils/direction-helpers';
 import type { DragManager } from './DragManager';
-import { DragState } from './DragManager';
 
-/**
- * 重连连线拖拽执行器
- * 处理拖拽已有连线端点进行重连的完整生命周期
- */
 export class ReConnectionDrag {
   private readonly dragManager: DragManager;
   private readonly chart: SvgEngine;
@@ -43,9 +37,6 @@ export class ReConnectionDrag {
     return this.chart.renderer;
   }
 
-  /**
-   * 启动重连拖拽
-   */
   start(anchor: Anchor, evt: MouseEvent): void {
     if (this.viewport.isSpaceActive() || this.dragManager.state !== 'idle') return;
 
@@ -71,12 +62,9 @@ export class ReConnectionDrag {
       evt,
       isReconnect: true,
     };
-    this.dragManager.state = DragState.LINK_DRAGGING;
+    this.dragManager.state = 'link_dragging';
   }
 
-  /**
-   * 真正开始拖拽（鼠标移动后）
-   */
   startDragging(): void {
     const pending = this.dragManager.pendingDrag;
     if (!pending) return;
@@ -115,14 +103,13 @@ export class ReConnectionDrag {
     if (!fixedNode) return;
 
     const fixedPos = this.store.calcAnchorPosForNode(fixedNode, fixedAnchor);
-    const orientation = getAnchorOrientation(fixedAnchor, fixedNode);
+    const orientation = getAnchorOrientation(fixedNode, fixedAnchor);
     const stroke = conn.stroke || Defaults.connection.stroke;
     const strokeWidth = conn.strokeWidth || Defaults.connection.strokeWidth;
     const connectorType = conn.connectorType;
 
     this.dragManager.linkDragData = {
       sourceAnchorId: anchor.id,
-      sourceAnchorType: anchor.type,
       startX: fixedPos.x,
       startY: fixedPos.y,
       endX: anchorPos.x,
@@ -143,9 +130,6 @@ export class ReConnectionDrag {
     this.renderer.highlightAnchor(anchor.id, true);
   }
 
-  /**
-   * 处理移动更新
-   */
   processMove(canvasPos: Point): boolean {
     const data = this.dragManager.linkDragData;
     if (!data) return false;
@@ -153,65 +137,43 @@ export class ReConnectionDrag {
     data.endX = canvasPos.x;
     data.endY = canvasPos.y;
 
-    let startX = data.startX;
-    let startY = data.startY;
-
     const srcAnchor = this.store.getAnchor(data.sourceAnchorId);
-
-    if (srcAnchor && srcAnchor.type === AnchorType.CONTINUOUS) {
-      const sourceNode = this.store.getNode(srcAnchor.nodeId);
-      if (sourceNode) {
-        const dynamicPos = getContinuousAnchorPosition(sourceNode, canvasPos);
-        startX = dynamicPos.x;
-        startY = dynamicPos.y;
-        data.startX = startX;
-        data.startY = startY;
-        console.log('✅ 动态起点更新（重连）:', startX, startY);
-      }
-    }
+    // 没有连续锚点逻辑，startX/startY 保持不变
 
     const stroke = data.stroke;
     const strokeWidth = data.strokeWidth;
-    const connectorType = data.connectorType || ConnectorType.FLOWCHART;
+    const connectorType = data.connectorType || 'flowchart';
     const orientation = data.orientation;
 
     this.renderer.setTempLine(
-      { x1: startX, y1: startY, x2: canvasPos.x, y2: canvasPos.y },
+      { x1: data.startX, y1: data.startY, x2: canvasPos.x, y2: canvasPos.y },
       connectorType,
-      true, // isReconnect = true
+      true,
       stroke,
       strokeWidth,
       orientation
     );
 
-    // 命中检测
     const hitAnchor = this.hitTest.findNearestAnchor(canvasPos, this.store, data.sourceAnchorId);
     const sourceAnchor = this.store.getAnchor(data.sourceAnchorId);
     const sourceNode = sourceAnchor ? this.store.getNode(sourceAnchor.nodeId) : null;
 
-    const directionCompatible = isDirectionCompatible(sourceAnchor, hitAnchor, data.dragDirection, true);
-
+    const directionCompatible = isDirectionCompatible(sourceAnchor, hitAnchor || undefined, data.dragDirection, true);
     const isValidTarget = hitAnchor && sourceNode && hitAnchor.id !== data.sourceAnchorId && directionCompatible;
 
     if (isValidTarget && hitAnchor !== this.dragManager.highlightedAnchor) {
-      console.log(
-        `[高亮] 拖拽端方向: ${data.dragDirection}, 目标锚点: ${hitAnchor.id}, 目标方向: ${hitAnchor.direction}`
-      );
       this.clearHighlight();
       this.dragManager.highlightedAnchor = hitAnchor;
       this.renderer.highlightAnchor(hitAnchor.id, true);
-      this.dragManager.state = DragState.HOVERING;
+      this.dragManager.state = 'hovering';
     } else if (!isValidTarget && this.dragManager.highlightedAnchor) {
       this.clearHighlight();
-      this.dragManager.state = DragState.LINK_DRAGGING;
+      this.dragManager.state = 'link_dragging';
     }
 
     return true;
   }
 
-  /**
-   * 结束拖拽（鼠标释放）
-   */
   end(evt: MouseEvent): void {
     const data = this.dragManager.linkDragData;
     if (!data) return;
@@ -248,7 +210,7 @@ export class ReConnectionDrag {
     this.clearHighlight();
     this.renderer.clearTempLine();
     this.dragManager.linkDragData = null;
-    this.dragManager.state = DragState.IDLE;
+    this.dragManager.state = 'idle';
   }
 
   private handleReconnectDrop(hitAnchor: Anchor): boolean {
@@ -288,9 +250,6 @@ export class ReConnectionDrag {
     }
   }
 
-  /**
-   * 取消拖拽
-   */
   cancel(): void {
     this.dragManager.linkDragData = null;
     this.dragManager.pendingDrag = null;

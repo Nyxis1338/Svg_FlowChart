@@ -5,8 +5,6 @@ import type { SelectionManager } from '../selection/SelectionManager';
 import type { Connection, LabelConfig, ArrowConfig } from '../../types/SvgModel';
 import type { Point } from '../../types/geometry';
 import { createSvgElement } from '../../utils/dom';
-import { ArrowDirection, ConnectorType } from '../../types/SvgModel';
-import { computePath } from '../../calc/connector/path';
 import { Defaults } from '../../styles/defaults';
 
 export class ConnectionRenderer {
@@ -17,25 +15,14 @@ export class ConnectionRenderer {
   ) {}
 
   render(skipIds?: Set<string>): void {
-    // ❌ 不再清空 layer，由 SvgRenderer 统一清空
     const connections = this.store.getAllConnections();
-    // 按 zIndex 升序排序
     const sorted = [...connections].sort((a, b) => (a.zIndex ?? 100) - (b.zIndex ?? 100));
 
     for (const conn of sorted) {
-      if (skipIds && skipIds.has(conn.id)) {
-        continue;
-      }
-
+      if (skipIds && skipIds.has(conn.id)) continue;
       const pathInfo = this.store.computeConnectionPath(conn);
       if (!pathInfo) continue;
-
-      const { start, end, pathD } = pathInfo;
-
-      const stub = conn.stub ?? Defaults.connection.stub;
-      const gap = conn.gap ?? Defaults.connection.gap;
-      const result = computePath(start, end, conn.connectorType, { stub, gap });
-      const adjustedPathD = result.pathD;
+      const { start, end, rawStart, rawEnd, pathD, startDirection, endDirection } = pathInfo;
 
       const g = createSvgElement('g') as SVGGElement;
       g.dataset['connectionId'] = conn.id;
@@ -43,33 +30,80 @@ export class ConnectionRenderer {
       g.dataset['zIndex'] = String(conn.zIndex ?? 100);
 
       const path = createSvgElement('path') as SVGPathElement;
-      path.setAttribute('d', adjustedPathD);
+      path.setAttribute('d', pathD);
       path.setAttribute('fill', 'none');
       const isSelected = this.selection.isSelected('connection', conn.id);
       const defaultStroke = Defaults.connection.stroke;
       const defaultWidth = Defaults.connection.strokeWidth;
-      path.setAttribute('stroke', isSelected ? Defaults.connection.selectedStroke : conn.stroke || defaultStroke);
-      path.setAttribute(
-        'stroke-width',
-        String(isSelected ? Defaults.connection.selectedStrokeWidth : conn.strokeWidth || defaultWidth)
-      );
+      const strokeColor = isSelected ? Defaults.connection.selectedStroke : conn.stroke || defaultStroke;
+      const strokeWidth = isSelected ? Defaults.connection.selectedStrokeWidth : conn.strokeWidth || defaultWidth;
+      path.setAttribute('stroke', strokeColor);
+      path.setAttribute('stroke-width', String(strokeWidth));
       path.setAttribute('stroke-linecap', Defaults.connection.strokeLinecap);
       path.setAttribute('stroke-linejoin', Defaults.connection.strokeLinejoin);
       g.appendChild(path);
+
+      if (conn.arrow && conn.arrow.direction !== 'none') {
+        const arrow = conn.arrow;
+        if (arrow.direction === 'target' || arrow.direction === 'both') {
+          const arrowEl = this.renderArrow(arrow, rawEnd, endDirection, strokeColor);
+          if (arrowEl) g.appendChild(arrowEl);
+        }
+        if (arrow.direction === 'source' || arrow.direction === 'both') {
+          const arrowEl = this.renderArrow(arrow, rawStart, startDirection, strokeColor);
+          if (arrowEl) g.appendChild(arrowEl);
+        }
+      }
 
       if (conn.label) {
         const labelEl = this.renderLabel(conn.label, { start, end, pathD });
         if (labelEl) g.appendChild(labelEl);
       }
 
-      if (conn.arrow && conn.arrow.direction !== ArrowDirection.NONE) {
-        const arrowEl = this.renderArrow(conn.arrow, { start, end, pathD }, conn.stroke);
-        if (arrowEl) g.appendChild(arrowEl);
-      }
-
-      // ✅ 添加到统一的 elementLayer
       this.elementLayer.appendChild(g);
     }
+  }
+
+  private renderArrow(arrow: ArrowConfig, tip: Point, dir: Point, color: string): SVGPathElement | null {
+    const length = arrow.length || Defaults.arrow.length;
+    const width = arrow.width || Defaults.arrow.width;
+    const type = arrow.type || Defaults.arrow.type;
+
+    const len = Math.hypot(dir.x, dir.y);
+    if (len < 0.001) return null;
+    const dx = dir.x / len;
+    const dy = dir.y / len;
+
+    const halfWidth = width / 2;
+    const base = {
+      x: tip.x - dx * length,
+      y: tip.y - dy * length,
+    };
+    const left = {
+      x: base.x + dy * halfWidth,
+      y: base.y - dx * halfWidth,
+    };
+    const right = {
+      x: base.x - dy * halfWidth,
+      y: base.y + dx * halfWidth,
+    };
+
+    const arrowPath = createSvgElement('path') as SVGPathElement;
+    let d = '';
+    if (type === 'fork') {
+      d += `M ${base.x.toFixed(2)} ${base.y.toFixed(2)} L ${left.x.toFixed(2)} ${left.y.toFixed(2)} `;
+      d += `M ${base.x.toFixed(2)} ${base.y.toFixed(2)} L ${right.x.toFixed(2)} ${right.y.toFixed(2)} `;
+      arrowPath.setAttribute('stroke', color);
+      arrowPath.setAttribute('stroke-width', String(width / 3));
+      arrowPath.setAttribute('fill', 'none');
+    } else {
+      d += `M ${tip.x.toFixed(2)} ${tip.y.toFixed(2)} L ${left.x.toFixed(2)} ${left.y.toFixed(2)} L ${right.x.toFixed(2)} ${right.y.toFixed(2)} Z`;
+      arrowPath.setAttribute('fill', color);
+      arrowPath.setAttribute('stroke', 'none');
+    }
+    arrowPath.setAttribute('d', d.trim());
+    arrowPath.setAttribute('pointer-events', 'none');
+    return arrowPath;
   }
 
   private renderLabel(
@@ -91,78 +125,7 @@ export class ConnectionRenderer {
     return text;
   }
 
-  private renderArrow(
-    arrow: ArrowConfig,
-    pathInfo: { start: Point; end: Point; pathD: string },
-    defaultColor?: string
-  ): SVGPathElement | null {
-    const direction = arrow.direction || ArrowDirection.TARGET;
-    const length = arrow.length || Defaults.arrow.length;
-    const width = arrow.width || Defaults.arrow.width;
-    const color = arrow.color || defaultColor || Defaults.arrow.color;
-    const foldback = arrow.foldback ?? Defaults.arrow.foldback;
-
-    const positions: Array<{ endpoint: Point; angle: number }> = [];
-    if (direction === ArrowDirection.TARGET || direction === ArrowDirection.BOTH) {
-      const angle = this.getLineAngle(pathInfo.start, pathInfo.end);
-      positions.push({ endpoint: pathInfo.end, angle });
-    }
-    if (direction === ArrowDirection.SOURCE || direction === ArrowDirection.BOTH) {
-      const angle = this.getLineAngle(pathInfo.end, pathInfo.start);
-      positions.push({ endpoint: pathInfo.start, angle });
-    }
-    if (positions.length === 0) return null;
-
-    const arrowPath = createSvgElement('path') as SVGPathElement;
-    let d = '';
-
-    for (const pos of positions) {
-      const { endpoint, angle } = pos;
-      const theta = angle;
-
-      const tip = { x: endpoint.x, y: endpoint.y };
-      const base = {
-        x: endpoint.x - Math.cos(theta) * length,
-        y: endpoint.y - Math.sin(theta) * length,
-      };
-
-      const halfWidth = width / 2;
-      const tailLeft = {
-        x: base.x + Math.cos(theta + Math.PI / 2) * halfWidth,
-        y: base.y + Math.sin(theta + Math.PI / 2) * halfWidth,
-      };
-      const tailRight = {
-        x: base.x + Math.cos(theta - Math.PI / 2) * halfWidth,
-        y: base.y + Math.sin(theta - Math.PI / 2) * halfWidth,
-      };
-
-      const foldDist = length * (1 - foldback);
-      const foldWidth = halfWidth * foldback;
-      const foldLeft = {
-        x: tip.x - Math.cos(theta) * foldDist + Math.cos(theta + Math.PI / 2) * foldWidth,
-        y: tip.y - Math.sin(theta) * foldDist + Math.sin(theta + Math.PI / 2) * foldWidth,
-      };
-      const foldRight = {
-        x: tip.x - Math.cos(theta) * foldDist + Math.cos(theta - Math.PI / 2) * foldWidth,
-        y: tip.y - Math.sin(theta) * foldDist + Math.sin(theta - Math.PI / 2) * foldWidth,
-      };
-
-      d += `M ${tip.x} ${tip.y} L ${foldLeft.x} ${foldLeft.y} L ${tailLeft.x} ${tailLeft.y} `;
-      d += `L ${tailRight.x} ${tailRight.y} L ${foldRight.x} ${foldRight.y} Z `;
-    }
-
-    arrowPath.setAttribute('d', d.trim());
-    arrowPath.setAttribute('fill', color);
-    arrowPath.setAttribute('stroke', 'none');
-    arrowPath.setAttribute('pointer-events', 'none');
-    return arrowPath;
-  }
-
   private getPathMidPoint(start: Point, end: Point): Point {
     return { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 };
-  }
-
-  private getLineAngle(start: Point, end: Point): number {
-    return Math.atan2(end.y - start.y, end.x - start.x);
   }
 }

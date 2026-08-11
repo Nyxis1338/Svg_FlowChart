@@ -4,7 +4,6 @@ import type { Point } from '../../types/geometry';
 import type { Anchor, Node, Connection } from '../../types/SvgModel';
 import { ConnectorType } from '../../types/SvgModel';
 import { Defaults } from '../../styles/defaults';
-import { computeConnectionPath } from '../../calc';
 
 // ==================== 类型定义 ====================
 type StoreChangeType = 'node' | 'anchor' | 'connection';
@@ -59,12 +58,6 @@ export class Store {
     this.removeAllAnchors(nodeId);
     // 2. 删除节点本身
     this.nodes.delete(nodeId);
-    // 3. 删除节点直连模式的连线（如果有）
-    for (const [id, c] of this.connections) {
-      if (c.sourceNodeId === nodeId || c.targetNodeId === nodeId) {
-        this.connections.delete(id);
-      }
-    }
     this.notify('node');
   }
 
@@ -178,9 +171,14 @@ export class Store {
   computeConnectionPath(conn: Connection): {
     start: Point;
     end: Point;
+    rawStart: Point;
+    rawEnd: Point;
     pathD: string;
+    startDirection: Point;
+    endDirection: Point;
   } | null {
-    return computeConnectionPath(conn, this.getAnchor.bind(this), this.getNode.bind(this), this.getAllNodes());
+    // 直接调用 generateConnectionPath（不再经过 computeConnectionPath）
+    return generateConnectionPath(conn, this.getNode.bind(this), this.getAnchor.bind(this));
   }
 
   // ---- 锚点位置计算（委托给 calc 模块） ----
@@ -328,4 +326,4 @@ export class Store {
 
 // 导入 calc 模块的函数（放在文件底部避免循环依赖）
 import { calcAnchorPosForNode } from '../../calc/anchor/position';
-import { computePath } from '../../calc/connector/path';
+import { generateConnectionPath } from '../../calc/connector/generator';

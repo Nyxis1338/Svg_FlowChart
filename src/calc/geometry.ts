@@ -242,3 +242,14 @@ export const Geometry = {
     };
   },
 };
+
+/**
+ * 计算从 from 到 to 的单位方向向量
+ */
+export function direction(from: Point, to: Point): Point {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const len = Math.hypot(dx, dy);
+  if (len < 1e-10) return { x: 0, y: 0 };
+  return { x: dx / len, y: dy / len };
+}

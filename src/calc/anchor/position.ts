@@ -2,152 +2,164 @@
 
 import type { Point, Rect } from '../../types/geometry';
 import type { Node, Anchor } from '../../types/SvgModel';
-import { NodeShape, AnchorType, AnchorPosition } from '../../types/SvgModel';
-import { getStaticAnchor } from './static';
-import { getPerimeterAnchor } from './perimeter';
-import { getContinuousAnchorPosition } from './continuous'; // 新增导入
+import type { NodeShape, AnchorPosition } from '../../types/SvgModel';
 
 /**
- * 根据节点和锚点计算锚点位置（主函数）
- * @param node 节点对象
- * @param anchor 锚点配置
- * @param externalPoint 可选的外部点（用于连续锚点动态计算）
+ * 根据节点和锚点计算锚点在画布上的坐标
+ * @param node 节点对象（包含位置、尺寸、形状）
+ * @param anchor 锚点对象（包含位置、偏移）
+ * @returns 锚点坐标 (x, y)
  */
-export function calcAnchorPosForNode(node: Node, anchor: Anchor, externalPoint?: Point): Point {
-  const rect = { x: node.x, y: node.y, width: node.width, height: node.height };
+export function calcAnchorPosForNode(node: Node, anchor: Anchor): Point {
+  const rect: Rect = {
+    x: node.x,
+    y: node.y,
+    width: node.width,
+    height: node.height,
+  };
 
-  // 静态锚点
-  if (anchor.type === AnchorType.STATIC && anchor.position) {
-    return getStaticAnchorPositionWithShape(rect, node.shape, anchor.position, anchor.offset);
+  const shape = node.shape;
+  const position = anchor.position;
+
+  if (!shape) {
+    throw new Error('节点缺少 shape 属性，请确保节点包含正确的形状（rectangle/circle/diamond/ellipse）');
+  }
+  if (!position) {
+    throw new Error('锚点缺少 position 属性，请确保锚点包含正确的位置（top/right/bottom/left等）');
   }
 
-  // 连续锚点
-  if (anchor.type === AnchorType.CONTINUOUS) {
-    // 如果有 perimeter 参数，使用均匀分布
-    if (anchor.perimeterTotal !== undefined && anchor.perimeterIndex !== undefined) {
-      let pt = getPerimeterAnchor(rect, anchor.perimeterTotal, anchor.perimeterIndex);
-      if (anchor.offset) {
-        pt = { x: pt.x + anchor.offset.x, y: pt.y + anchor.offset.y };
-      }
-      return pt;
-    }
-
-    // 如果有外部点，使用动态射线相交计算
-    if (externalPoint) {
-      return getContinuousAnchorPosition(node, externalPoint);
-    }
-
-    // 否则返回默认边缘点（根据方向）
-    const cx = rect.x + rect.width / 2;
-    const cy = rect.y + rect.height / 2;
-    const dir = anchor.direction || 'both';
-
-    // 优先使用 position 字段（如果存在）
-    if (anchor.position) {
-      return getStaticAnchor(rect, anchor.position, anchor.offset);
-    }
-
-    // 默认策略
-    if (dir === 'output' || dir === 'both') {
-      return { x: cx, y: rect.y + rect.height };
-    } else {
-      return { x: cx, y: rect.y };
-    }
-  }
-
-  // 其他情况：返回节点中心
-  return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
-}
-
-// ============ 内部辅助 ============
-
-function getStaticAnchorPositionWithShape(
-  rect: Rect,
-  shape: NodeShape | undefined,
-  position: AnchorPosition,
-  offset?: Point
-): Point {
   let pt: Point;
-  if (shape === NodeShape.CIRCLE) {
-    const cx = rect.x + rect.width / 2;
-    const cy = rect.y + rect.height / 2;
-    const r = Math.min(rect.width, rect.height) / 2;
-    const angle = getAngleForPosition(position);
-    pt = { x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle) };
-  } else if (shape === NodeShape.ELLIPSE) {
-    const cx = rect.x + rect.width / 2;
-    const cy = rect.y + rect.height / 2;
-    const rx = rect.width / 2;
-    const ry = rect.height / 2;
-    const angle = getAngleForPosition(position);
-    pt = { x: cx + rx * Math.cos(angle), y: cy + ry * Math.sin(angle) };
-  } else if (shape === NodeShape.DIAMOND) {
-    pt = getDiamondAnchorPosition(rect, position);
-  } else {
-    // 矩形或其他（默认矩形边缘）
-    pt = getStaticAnchor(rect, position);
+  switch (shape) {
+    case 'circle':
+      pt = getCircleAnchor(rect, position);
+      break;
+    case 'ellipse':
+      pt = getEllipseAnchor(rect, position);
+      break;
+    case 'diamond':
+      pt = getDiamondAnchor(rect, position);
+      break;
+    default:
+      pt = getRectAnchor(rect, position);
   }
-  if (offset) {
-    pt = { x: pt.x + offset.x, y: pt.y + offset.y };
-  }
+
   return pt;
 }
 
-function getDiamondAnchorPosition(rect: Rect, position: AnchorPosition): Point {
+// ============ 矩形锚点 ============
+
+function getRectAnchor(rect: Rect, position: AnchorPosition): Point {
+  const cx = rect.x + rect.width / 2;
+  const cy = rect.y + rect.height / 2;
+  switch (position) {
+    case 'top-left':
+      return { x: rect.x, y: rect.y };
+    case 'top':
+      return { x: cx, y: rect.y };
+    case 'top-right':
+      return { x: rect.x + rect.width, y: rect.y };
+    case 'right':
+      return { x: rect.x + rect.width, y: cy };
+    case 'bottom-right':
+      return { x: rect.x + rect.width, y: rect.y + rect.height };
+    case 'bottom':
+      return { x: cx, y: rect.y + rect.height };
+    case 'bottom-left':
+      return { x: rect.x, y: rect.y + rect.height };
+    case 'left':
+      return { x: rect.x, y: cy };
+    default:
+      return { x: cx, y: cy };
+  }
+}
+
+// ============ 圆形锚点 ============
+
+function getCircleAnchor(rect: Rect, position: AnchorPosition): Point {
+  const cx = rect.x + rect.width / 2;
+  const cy = rect.y + rect.height / 2;
+  const r = Math.min(rect.width, rect.height) / 2;
+  const angle = getAngleForPosition(position);
+  return {
+    x: cx + r * Math.cos(angle),
+    y: cy + r * Math.sin(angle),
+  };
+}
+
+// ============ 椭圆锚点 ============
+
+function getEllipseAnchor(rect: Rect, position: AnchorPosition): Point {
+  const cx = rect.x + rect.width / 2;
+  const cy = rect.y + rect.height / 2;
+  const rx = rect.width / 2;
+  const ry = rect.height / 2;
+  const angle = getAngleForPosition(position);
+  return {
+    x: cx + rx * Math.cos(angle),
+    y: cy + ry * Math.sin(angle),
+  };
+}
+
+// ============ 菱形锚点 ============
+
+function getDiamondAnchor(rect: Rect, position: AnchorPosition): Point {
   const cx = rect.x + rect.width / 2;
   const cy = rect.y + rect.height / 2;
   const hw = rect.width / 2;
   const hh = rect.height / 2;
-
   const top = { x: cx, y: cy - hh };
   const right = { x: cx + hw, y: cy };
   const bottom = { x: cx, y: cy + hh };
   const left = { x: cx - hw, y: cy };
-
   const mid = (p1: Point, p2: Point): Point => ({
     x: (p1.x + p2.x) / 2,
     y: (p1.y + p2.y) / 2,
   });
 
   switch (position) {
-    case AnchorPosition.TOP_LEFT:
+    case 'top-left':
       return mid(left, top);
-    case AnchorPosition.TOP:
+    case 'top':
       return top;
-    case AnchorPosition.TOP_RIGHT:
+    case 'top-right':
       return mid(top, right);
-    case AnchorPosition.RIGHT:
+    case 'right':
       return right;
-    case AnchorPosition.BOTTOM_RIGHT:
+    case 'bottom-right':
       return mid(right, bottom);
-    case AnchorPosition.BOTTOM:
+    case 'bottom':
       return bottom;
-    case AnchorPosition.BOTTOM_LEFT:
+    case 'bottom-left':
       return mid(bottom, left);
-    case AnchorPosition.LEFT:
+    case 'left':
       return left;
     default:
       return { x: cx, y: cy };
   }
 }
 
+// ============ 工具函数 ============
+
+/**
+ * 将锚点位置枚举转换为弧度角度（用于圆形和椭圆）
+ */
 function getAngleForPosition(position: AnchorPosition): number {
   switch (position) {
-    case AnchorPosition.TOP_LEFT:
+    case 'top-left':
       return -Math.PI * 0.75;
-    case AnchorPosition.TOP:
+    case 'top':
       return -Math.PI / 2;
-    case AnchorPosition.TOP_RIGHT:
+    case 'top-right':
       return -Math.PI * 0.25;
-    case AnchorPosition.RIGHT:
+    case 'right':
       return 0;
-    case AnchorPosition.BOTTOM_RIGHT:
+    case 'bottom-right':
       return Math.PI * 0.25;
-    case AnchorPosition.BOTTOM:
+    case 'bottom':
       return Math.PI / 2;
-    case AnchorPosition.BOTTOM_LEFT:
+    case 'bottom-left':
       return Math.PI * 0.75;
-    case AnchorPosition.LEFT:
+    case 'left':
       return Math.PI;
     default:
       return 0;

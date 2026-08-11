@@ -1,16 +1,15 @@
 // src/main.ts
 
 import { SvgEngine } from './core/SvgEngine';
-import { NodeShape, ArrowDirection, ConnectorType, AnchorPosition, AnchorType } from './types/SvgModel';
+import { NodeShape } from './types/SvgModel';
 import { ConnectorColors } from './styles/defaults';
 
-// ==================== 工具函数 ====================
-
+// 工具函数
 function randomColor(): string {
   return ConnectorColors[Math.floor(Math.random() * ConnectorColors.length)];
 }
 
-function getAnchor(store: any, nodeId: string, position: AnchorPosition, direction: 'output' | 'input' | 'both') {
+function getAnchor(store: any, nodeId: string, position: string, direction: 'output' | 'input' | 'both') {
   const nodeAnchors = store.getNodeAnchors(nodeId);
   return nodeAnchors.find(
     (ap: any) => ap.position === position && (ap.direction === direction || ap.direction === 'both')
@@ -24,10 +23,10 @@ function addDefaultAnchors(chart: SvgEngine, nodeId: string): void {
     store.removeAnchor(a.id);
   }
 
+  // 使用字符串字面量，不再需要 type 字段
   chart.addAnchor({
     nodeId,
-    type: AnchorType.STATIC,
-    position: AnchorPosition.TOP,
+    position: 'top',
     direction: 'output',
     radius: 5,
     fill: '#ffffff',
@@ -35,8 +34,7 @@ function addDefaultAnchors(chart: SvgEngine, nodeId: string): void {
   });
   chart.addAnchor({
     nodeId,
-    type: AnchorType.STATIC,
-    position: AnchorPosition.RIGHT,
+    position: 'right',
     direction: 'output',
     radius: 5,
     fill: '#ffffff',
@@ -45,8 +43,7 @@ function addDefaultAnchors(chart: SvgEngine, nodeId: string): void {
 
   chart.addAnchor({
     nodeId,
-    type: AnchorType.STATIC,
-    position: AnchorPosition.BOTTOM,
+    position: 'bottom',
     direction: 'input',
     radius: 5,
     fill: '#e8f5e9',
@@ -54,8 +51,7 @@ function addDefaultAnchors(chart: SvgEngine, nodeId: string): void {
   });
   chart.addAnchor({
     nodeId,
-    type: AnchorType.STATIC,
-    position: AnchorPosition.LEFT,
+    position: 'left',
     direction: 'input',
     radius: 5,
     fill: '#e8f5e9',
@@ -77,21 +73,19 @@ function safeAddConnection(store: any, sourceAnchor: any, targetAnchor: any, pro
 }
 
 // ==================== 初始化画布 ====================
-
 const appDom = document.getElementById('canvas-container')!;
 const chart = new SvgEngine(appDom);
 (window as any).chart = chart;
 const store = chart.store;
 
 // ==================== 创建节点 ====================
-
 const nodeA = chart.addNode({
   x: 80,
   y: 80,
   width: 150,
   height: 90,
   label: '矩形A',
-  shape: NodeShape.RECTANGLE,
+  shape: 'rectangle',
 });
 (window as any).nodeA = nodeA;
 addDefaultAnchors(chart, nodeA.id);
@@ -102,7 +96,7 @@ const nodeB = chart.addNode({
   width: 120,
   height: 120,
   label: '圆形B',
-  shape: NodeShape.CIRCLE,
+  shape: 'circle',
 });
 (window as any).nodeB = nodeB;
 addDefaultAnchors(chart, nodeB.id);
@@ -113,7 +107,7 @@ const nodeC = chart.addNode({
   width: 140,
   height: 100,
   label: '菱形C',
-  shape: NodeShape.DIAMOND,
+  shape: 'diamond',
 });
 (window as any).nodeC = nodeC;
 addDefaultAnchors(chart, nodeC.id);
@@ -124,50 +118,51 @@ const nodeD = chart.addNode({
   width: 160,
   height: 100,
   label: '椭圆D',
-  shape: NodeShape.ELLIPSE,
+  shape: 'ellipse',
 });
 (window as any).nodeD = nodeD;
 addDefaultAnchors(chart, nodeD.id);
 
 // ==================== 创建连线 ====================
-
-const aRightOut = getAnchor(store, nodeA.id, AnchorPosition.RIGHT, 'output');
-const bLeftIn = getAnchor(store, nodeB.id, AnchorPosition.LEFT, 'input');
+const aRightOut = getAnchor(store, nodeA.id, 'right', 'output');
+const bLeftIn = getAnchor(store, nodeB.id, 'left', 'input');
 safeAddConnection(store, aRightOut, bLeftIn, {
-  connectorType: ConnectorType.FLOWCHART,
+  connectorType: 'flowchart',
   stroke: randomColor(),
   strokeWidth: 2,
   label: { text: '折线', fontSize: 12, color: '#333', offset: { x: 0, y: -12 } },
-  arrow: { direction: ArrowDirection.TARGET, length: 12 },
+  arrow: { direction: 'target', length: 12 },
 });
 
-const aTopOut = getAnchor(store, nodeA.id, AnchorPosition.TOP, 'output');
-const cLeftIn = getAnchor(store, nodeC.id, AnchorPosition.LEFT, 'input');
+const aTopOut = getAnchor(store, nodeA.id, 'top', 'output');
+const cLeftIn = getAnchor(store, nodeC.id, 'left', 'input');
 safeAddConnection(store, aTopOut, cLeftIn, {
-  connectorType: ConnectorType.STRAIGHT,
+  connectorType: 'straight',
   stroke: randomColor(),
   strokeWidth: 2,
   label: { text: '直线', fontSize: 12, color: '#333', offset: { x: 20, y: 0 } },
-  arrow: { direction: ArrowDirection.TARGET, length: 12 },
+  arrow: { direction: 'target', length: 12 },
 });
 
-const bRightOut = getAnchor(store, nodeB.id, AnchorPosition.RIGHT, 'output');
-const dLeftIn = getAnchor(store, nodeD.id, AnchorPosition.LEFT, 'input');
+const bRightOut = getAnchor(store, nodeB.id, 'right', 'output');
+const dLeftIn = getAnchor(store, nodeD.id, 'left', 'input');
 safeAddConnection(store, bRightOut, dLeftIn, {
-  connectorType: ConnectorType.BEZIER,
+  connectorType: 'bezier',
   stroke: randomColor(),
   strokeWidth: 2,
   label: { text: '贝塞尔', fontSize: 12, color: '#333', offset: { x: 0, y: -15 } },
-  arrow: { direction: ArrowDirection.BOTH, length: 12 },
+  arrow: { direction: 'both', length: 12 },
 });
 
-const dTopOut = getAnchor(store, nodeD.id, AnchorPosition.TOP, 'output');
-const cbottomIn = getAnchor(store, nodeC.id, AnchorPosition.BOTTOM, 'input');
-safeAddConnection(store, dTopOut, cbottomIn, {
-  connectorType: ConnectorType.FLOWCHART,
+const dTopOut = getAnchor(store, nodeD.id, 'top', 'output');
+const cBottomIn = getAnchor(store, nodeC.id, 'bottom', 'input');
+safeAddConnection(store, dTopOut, cBottomIn, {
+  connectorType: 'flowchart',
   stroke: randomColor(),
   strokeWidth: 2,
 });
+
+// 其余代码（锚点点击监听、调试日志、UI按钮等）保持不变，只需确保没有枚举引用。
 
 // ==================== 锚点点击监听（调试用） ====================
 chart.svgRoot.addEventListener('click', e => {
@@ -183,7 +178,6 @@ chart.svgRoot.addEventListener('click', e => {
         nodeLabel: node?.label || '未知',
         position: anchor.position,
         direction: anchor.direction,
-        type: anchor.type,
         radius: anchor.radius,
         fill: anchor.fill,
         stroke: anchor.stroke,
@@ -228,7 +222,7 @@ console.log('💡 点击任意锚点，控制台将输出其详细信息');
 // ==================== UI 按钮 ====================
 
 document.getElementById('addNodeBtn')?.addEventListener('click', () => {
-  const shapes = [NodeShape.RECTANGLE, NodeShape.CIRCLE, NodeShape.DIAMOND, NodeShape.ELLIPSE];
+  const shapes: NodeShape[] = ['rectangle', 'circle', 'diamond', 'ellipse'];
   const randShape = shapes[Math.floor(Math.random() * shapes.length)];
   const randX = 50 + Math.random() * 600;
   const randY = 50 + Math.random() * 400;

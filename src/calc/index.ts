@@ -10,14 +10,6 @@
  * - connector: 连线路径生成（straight / bezier / flowchart）
  */
 
-// 导出几何工具
 export * from './geometry';
-
-// 导出锚点计算模块
 export * from './anchor';
-
-// 导出连线路径生成模块
 export * from './connector';
-
-// 导出连线构建器
-export * from './connection-builder';

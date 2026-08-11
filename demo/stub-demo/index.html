@@ -2,31 +2,69 @@
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
-    <title>Stub 方向测试</title>
+    <title>Stub 垂直引出演示（多种连线类型）</title>
     <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
       body {
         padding: 20px;
-        font-family: sans-serif;
+        font-family: 'Segoe UI', sans-serif;
         background: #f5f7fa;
+      }
+      h2 {
+        margin-bottom: 12px;
+        font-weight: 400;
       }
       #container {
         width: 100%;
         height: 600px;
         background: #fff;
         border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
       }
-      .tip {
-        background: #e3f2fd;
+      #log {
+        margin-top: 12px;
         padding: 8px 14px;
+        background: #1e1e1e;
+        color: #d4d4d4;
         border-radius: 4px;
-        margin-bottom: 12px;
+        font-family: monospace;
+        font-size: 13px;
+        max-height: 120px;
+        overflow-y: auto;
+      }
+      .toolbar {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-bottom: 16px;
+      }
+      .toolbar button {
+        padding: 6px 16px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        background: #fff;
+        cursor: pointer;
+        font-size: 13px;
+        transition: 0.2s;
+      }
+      .toolbar button:hover {
+        background: #e3f2fd;
+        border-color: #1976d2;
       }
     </style>
   </head>
   <body>
-    <h2>🧭 Stub 方向测试（Flowchart 连线）</h2>
-    <div class="tip">每个节点的锚点方向固定：A 右 → B 左，A 下 → C 上，B 下 → D 上。观察 stub 是否垂直向外。</div>
+    <h2>🧪 Stub 垂直引出 + 箭头调试（直线 / 流程图 / 贝塞尔）</h2>
+    <div class="toolbar">
+      <button id="btn-reset">重置节点位置</button>
+      <span style="margin-left: auto; font-size: 13px; color: #555">💡 控制台执行 getArrowInfo() 查看箭头信息</span>
+    </div>
     <div id="container"></div>
+    <div id="log">初始化... 拖动节点观察 stub 和箭头</div>
 
     <script type="importmap">
       { "imports": { "svg-flowchart": "../../src/" } }
@@ -34,95 +72,209 @@
     <script type="module">
       import { SvgEngine } from '../../src/core/SvgEngine';
       import { NodeShape, AnchorPosition, AnchorType, ConnectorType, ArrowDirection } from '../../src/types/SvgModel';
+      import { Defaults } from '../../src/styles/defaults';
 
       const container = document.getElementById('container');
       const chart = new SvgEngine(container);
       window.chart = chart;
       const store = chart.store;
+      const logEl = document.getElementById('log');
 
-      // 辅助：添加四个方向的静态锚点
+      function log(msg) {
+        logEl.textContent = msg;
+        console.log(msg);
+      }
+
+      // ---- 辅助：添加四个方向锚点 ----
       function addAnchors(nodeId) {
         chart.addAnchor({
           nodeId,
           type: AnchorType.STATIC,
-          position: AnchorPosition.TOP,
+          position: 'top',
           direction: 'output',
           radius: 5,
         });
         chart.addAnchor({
           nodeId,
           type: AnchorType.STATIC,
-          position: AnchorPosition.RIGHT,
+          position: 'right',
           direction: 'output',
           radius: 5,
         });
         chart.addAnchor({
           nodeId,
           type: AnchorType.STATIC,
-          position: AnchorPosition.BOTTOM,
-          direction: 'output',
+          position: 'bottom',
+          direction: 'input',
           radius: 5,
         });
         chart.addAnchor({
           nodeId,
           type: AnchorType.STATIC,
-          position: AnchorPosition.LEFT,
-          direction: 'output',
+          position: 'left',
+          direction: 'input',
           radius: 5,
         });
       }
 
-      // 创建四个节点
-      const nodeA = chart.addNode({ x: 80, y: 80, width: 120, height: 80, label: 'A', shape: NodeShape.RECTANGLE });
-      const nodeB = chart.addNode({ x: 380, y: 80, width: 120, height: 80, label: 'B', shape: NodeShape.RECTANGLE });
-      const nodeC = chart.addNode({ x: 80, y: 280, width: 120, height: 80, label: 'C', shape: NodeShape.RECTANGLE });
-      const nodeD = chart.addNode({ x: 380, y: 280, width: 120, height: 80, label: 'D', shape: NodeShape.RECTANGLE });
-      [nodeA, nodeB, nodeC, nodeD].forEach(n => addAnchors(n.id));
+      // ---- 创建四个节点 ----
+      const nodeA = chart.addNode({
+        x: 60,
+        y: 60,
+        width: 140,
+        height: 90,
+        label: 'A',
+        shape: 'rectangle',
+        stroke: '#7b1fa2',
+        strokeWidth: 3,
+      });
+      addAnchors(nodeA.id);
 
-      // 获取锚点
-      const aRight = store.getNodeAnchors(nodeA.id).find(a => a.position === AnchorPosition.RIGHT);
-      const bLeft = store.getNodeAnchors(nodeB.id).find(a => a.position === AnchorPosition.LEFT);
-      const aBottom = store.getNodeAnchors(nodeA.id).find(a => a.position === AnchorPosition.BOTTOM);
-      const cTop = store.getNodeAnchors(nodeC.id).find(a => a.position === AnchorPosition.TOP);
-      const bBottom = store.getNodeAnchors(nodeB.id).find(a => a.position === AnchorPosition.BOTTOM);
-      const dTop = store.getNodeAnchors(nodeD.id).find(a => a.position === AnchorPosition.TOP);
+      const nodeB = chart.addNode({
+        x: 360,
+        y: 60,
+        width: 140,
+        height: 90,
+        label: 'B',
+        shape: 'rectangle',
+        stroke: '#7b1fa2',
+        strokeWidth: 3,
+      });
+      addAnchors(nodeB.id);
 
-      // 创建三条 Flowchart 连线
+      const nodeC = chart.addNode({
+        x: 200,
+        y: 260,
+        width: 140,
+        height: 90,
+        label: 'C',
+        shape: 'diamond',
+        stroke: '#7b1fa2',
+        strokeWidth: 3,
+      });
+      addAnchors(nodeC.id);
+
+      const nodeD = chart.addNode({
+        x: 480,
+        y: 260,
+        width: 140,
+        height: 90,
+        label: 'D',
+        shape: 'ellipse',
+        stroke: '#7b1fa2',
+        strokeWidth: 3,
+      });
+      addAnchors(nodeD.id);
+
+      // ---- 1. 直线（红色） ----
+      const aRight = store.getNodeAnchors(nodeA.id).find(a => a.position === 'right');
+      const bLeft = store.getNodeAnchors(nodeB.id).find(a => a.position === 'left');
       if (aRight && bLeft) {
         chart.addConnection({
-          connectorType: ConnectorType.FLOWCHART,
+          connectorType: 'straight',
           sourceAnchorId: aRight.id,
           targetAnchorId: bLeft.id,
           stroke: '#e74c3c',
-          strokeWidth: 2,
-          label: { text: '右→左', fontSize: 12, color: '#333' },
-          stub: 30,
-        });
-      }
-      if (aBottom && cTop) {
-        chart.addConnection({
-          connectorType: ConnectorType.FLOWCHART,
-          sourceAnchorId: aBottom.id,
-          targetAnchorId: cTop.id,
-          stroke: '#2ecc71',
-          strokeWidth: 2,
-          label: { text: '下→上', fontSize: 12, color: '#333' },
-          stub: 30,
-        });
-      }
-      if (bBottom && dTop) {
-        chart.addConnection({
-          connectorType: ConnectorType.FLOWCHART,
-          sourceAnchorId: bBottom.id,
-          targetAnchorId: dTop.id,
-          stroke: '#3498db',
-          strokeWidth: 2,
-          label: { text: '下→上', fontSize: 12, color: '#333' },
-          stub: 30,
+          strokeWidth: 3,
+          stub: 40,
+          gap: 0,
+          arrow: { direction: ArrowDirection.TARGET, length: 18, angle: 30, type: 'triangle' },
         });
       }
 
-      console.log('✅ Stub 测试示例已加载。拖动节点可观察 stub 是否始终垂直向外。');
+      // ---- 2. 流程图（绿色） ----
+      const aBottom = store.getNodeAnchors(nodeA.id).find(a => a.position === 'bottom');
+      const cTop = store.getNodeAnchors(nodeC.id).find(a => a.position === 'top');
+      if (aBottom && cTop) {
+        chart.addConnection({
+          connectorType: 'flowchart',
+          sourceAnchorId: aBottom.id,
+          targetAnchorId: cTop.id,
+          stroke: '#2ecc71',
+          strokeWidth: 3,
+          stub: 40,
+          gap: 0,
+          arrow: { direction: ArrowDirection.TARGET, length: 18, angle: 30, type: 'triangle' },
+        });
+      }
+
+      // ---- 3. 贝塞尔（紫色） ----
+      const bRight = store.getNodeAnchors(nodeB.id).find(a => a.position === 'right');
+      const dLeft = store.getNodeAnchors(nodeD.id).find(a => a.position === 'left');
+      if (bRight && dLeft) {
+        chart.addConnection({
+          connectorType: 'bezier',
+          sourceAnchorId: bRight.id,
+          targetAnchorId: dLeft.id,
+          stroke: '#9b59b6',
+          strokeWidth: 3,
+          stub: 40,
+          gap: 0,
+          arrow: { direction: ArrowDirection.TARGET, length: 18, angle: 30, type: 'fork' },
+        });
+      }
+
+      log('✅ 就绪。三种连线类型均显示 stub（法线方向）。箭头：直线/流程图用三角形，贝塞尔用三叉。');
+
+      // ---- 重置按钮 ----
+      document.getElementById('btn-reset').addEventListener('click', () => {
+        chart.updateNode(nodeA.id, { x: 60, y: 60 });
+        chart.updateNode(nodeB.id, { x: 360, y: 60 });
+        chart.updateNode(nodeC.id, { x: 200, y: 260 });
+        chart.updateNode(nodeD.id, { x: 480, y: 260 });
+        log('节点位置已重置');
+      });
+
+      // ---- 挂载调试辅助到全局 ----
+      window.getArrowInfo = function (connId) {
+        const conn = connId ? store.getConnection(connId) : store.getAllConnections()[0];
+        if (!conn) {
+          console.warn('未找到连线');
+          return;
+        }
+        const arrow = conn.arrow;
+        if (!arrow || arrow.direction === 'none') {
+          console.warn('该连线没有箭头');
+          return;
+        }
+        const pathInfo = store.computeConnectionPath(conn);
+        if (!pathInfo) {
+          console.warn('无法计算路径');
+          return;
+        }
+        const { startDirection, endDirection, start, end } = pathInfo;
+
+        console.group('箭头信息');
+        console.log('连线 ID:', conn.id);
+        console.log('箭头配置:', arrow);
+        console.log('起点:', start);
+        console.log('终点:', end);
+
+        // 根据方向选择对应的方向向量
+        const dir = arrow.direction === 'target' ? endDirection : arrow.direction === 'source' ? startDirection : null;
+        if (!dir) {
+          console.warn('方向向量为空');
+          console.groupEnd();
+          return;
+        }
+        const angleDeg = (Math.atan2(dir.y, dir.x) * 180) / Math.PI;
+        console.log('方向向量:', dir);
+        console.log('方向角度（度）:', angleDeg);
+
+        const length = arrow.length || Defaults.arrow.length;
+        const width = arrow.width || Defaults.arrow.width;
+        console.log('箭头长度:', length);
+        console.log('箭头宽度:', width);
+        const tipAngle = (2 * Math.atan2(width / 2, length) * 180) / Math.PI;
+        console.log('箭头顶角（度）:', tipAngle.toFixed(2));
+
+        if (arrow.angle !== undefined) {
+          console.log('指定顶角（度）:', arrow.angle);
+        }
+        console.groupEnd();
+      };
+
+      console.log('💡 在控制台执行 getArrowInfo() 可查看第一条连线的箭头信息，传入连线ID可查看指定连线');
     </script>
   </body>
 </html>

@@ -2,6 +2,7 @@
 
 import type { Store } from '../store/Store';
 import type { Anchor } from '../../types/SvgModel';
+import { createSvgElement } from '../../utils/dom';
 import { Defaults } from '../../styles/defaults';
 
 export class AnchorRenderer {
@@ -10,15 +11,38 @@ export class AnchorRenderer {
     private readonly elementLayer: SVGGElement
   ) {}
 
-  // 不再需要 render，因为锚点由 NodeRenderer 绘制
-  // render() 可以删除
+  render(): void {
+    // 清空由 SvgRenderer 统一处理，这里直接添加
+    const anchors = this.store.getAllAnchors();
+    for (const ap of anchors) {
+      const node = this.store.getNode(ap.nodeId);
+      if (!node) continue;
+
+      const pos = this.store.calcAnchorPosForNode(node, ap);
+      const circle = createSvgElement('circle') as SVGCircleElement;
+      const radius = ap.radius ?? Defaults.anchor.radius;
+      circle.setAttribute('cx', String(pos.x));
+      circle.setAttribute('cy', String(pos.y));
+      circle.setAttribute('r', String(radius));
+      circle.style.cursor = 'default';
+      circle.style.transition = 'all 0.15s ease-out';
+      circle.dataset['anchorId'] = ap.id;
+
+      const dirStyle = Defaults.anchor.directionStyles[ap.direction] || Defaults.anchor.directionStyles.both;
+      circle.setAttribute('fill', ap.fill ?? dirStyle.fill);
+      circle.setAttribute('stroke', ap.stroke ?? dirStyle.stroke);
+      circle.setAttribute('stroke-width', String(ap.strokeWidth ?? dirStyle.strokeWidth));
+
+      this.elementLayer.appendChild(circle);
+    }
+  }
 
   highlightAnchor(anchorId: string, highlight: boolean): void {
-    // 锚点现在是节点的子元素，需要从 elementLayer 中查找
     const circles = this.elementLayer.querySelectorAll(`circle[data-anchor-id="${anchorId}"]`);
     for (const circle of circles) {
       const ap = this.store.getAnchor(anchorId);
       const baseRadius = ap?.radius ?? Defaults.anchor.radius;
+
       if (highlight) {
         const hoverRadius = baseRadius * Defaults.anchor.hoverRadiusMultiplier;
         circle.setAttribute('r', String(hoverRadius));

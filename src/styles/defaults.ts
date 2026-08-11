@@ -69,9 +69,9 @@ export const Defaults = {
 
   /** 箭头默认样式 */
   arrow: {
-    type: 'fork', // 'fork' | 'triangle'
+    type: 'triangle', // 'fork' | 'triangle'
     length: 12,
-    width: 8,
+    width: 10,
     foldback: 0.623, // 三叉箭头经典值
     color: '#5b6c7d', // 默认与连线同色
   },
@@ -83,15 +83,6 @@ export const Defaults = {
     offsetX: 0,
     offsetY: -10,
     fontFamily: 'sans-serif',
-  },
-
-  /** 连接手柄默认样式（新增） */
-  handle: {
-    size: 16,
-    stroke: '#5470c6',
-    strokeWidth: 2,
-    background: 'rgba(255,255,255,0.9)',
-    hoverStroke: '#ff6b6b',
   },
 } as const;
 
