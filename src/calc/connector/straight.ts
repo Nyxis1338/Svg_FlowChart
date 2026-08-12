@@ -1,6 +1,13 @@
 // src/calc/connector/straight.ts
 
 import type { Point } from '../../types/geometry';
+import { Geometry } from '../geometry';
+
+export interface StraightResult {
+  path: string;
+  startDirection: { dx: number; dy: number };
+  endDirection: { dx: number; dy: number };
+}
 
 /**
  * 直线连接器：生成从起点到终点的直线路径
@@ -8,6 +15,11 @@ import type { Point } from '../../types/geometry';
  * @param end 终点坐标
  * @returns SVG 路径字符串，例如 "M 10 20 L 100 200"
  */
-export function connectorStraight(start: Point, end: Point): string {
-  return `M ${start.x} ${start.y} L ${end.x} ${end.y}`;
+export function connectorStraight(start: Point, end: Point): StraightResult {
+  const path = `M ${start.x} ${start.y} L ${end.x} ${end.y}`;
+  return {
+    path,
+    startDirection: Geometry.direction(end, start), // 反向
+    endDirection: Geometry.direction(start, end),
+  };
 }

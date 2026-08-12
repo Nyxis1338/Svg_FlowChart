@@ -3,6 +3,7 @@
 import type { Point } from '../../types/geometry';
 import type { Node, Anchor } from '../../types/SvgModel';
 import { calcAnchorPosForNode } from './position';
+import { Geometry } from '../geometry';
 
 /**
  * 计算锚点法线方向
@@ -37,7 +38,8 @@ export function getAnchorOrientation(node: Node, anchor: Anchor): { dx: number; 
         x: node.x + node.width / 2,
         y: node.y + node.height / 2,
       };
-      return normalizeDirection(anchorPos, center);
+      return Geometry.direction(center, anchorPos);
+
     default:
       throw new Error('节点 shape 属性不正确');
   }
@@ -86,10 +88,10 @@ function getCardinalOrientation(position: string): { dx: number; dy: number } {
 /**
  * 计算从中心到锚点的方向向量（归一化）
  */
-function normalizeDirection(from: Point, to: Point): { dx: number; dy: number } {
-  const dx = to.x - from.x;
-  const dy = to.y - from.y;
-  const len = Math.hypot(dx, dy);
-  if (len === 0) return { dx: 0, dy: 1 };
-  return { dx: dx / len, dy: dy / len };
-}
+// function normalizeDirection(from: Point, to: Point): { dx: number; dy: number } {
+//   const dx = to.x - from.x;
+//   const dy = to.y - from.y;
+//   const len = Math.hypot(dx, dy);
+//   if (len === 0) return { dx: 0, dy: 1 };
+//   return { dx: dx / len, dy: dy / len };
+// }

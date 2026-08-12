@@ -38,7 +38,7 @@ export class Store {
     const newNode = { ...node, zIndex: node.zIndex ?? this.getNextZIndex() };
     this.nodes.set(node.id, structuredClone(newNode));
     this.notify('node');
-    return node;
+    return newNode;
   }
 
   getNode(nodeId: string): Node | undefined {
@@ -67,9 +67,10 @@ export class Store {
 
   // ---- Anchor 操作 ----
   addAnchor(anchor: Anchor): Anchor {
-    this.anchors.set(anchor.id, structuredClone(anchor));
+    const newAnchor = { ...anchor, zIndex: anchor.zIndex ?? this.getNextZIndex() };
+    this.anchors.set(newAnchor.id, structuredClone(newAnchor));
     this.notify('anchor');
-    return anchor;
+    return newAnchor;
   }
 
   getAnchor(anchorId: string): Anchor | undefined {
@@ -133,7 +134,7 @@ export class Store {
     const newConn = { ...conn, zIndex: conn.zIndex ?? this.getNextZIndex() };
     this.connections.set(newConn.id, structuredClone(newConn));
     this.notify('connection');
-    return conn;
+    return newConn;
   }
 
   getConnection(connId: string): Connection | undefined {
@@ -174,8 +175,8 @@ export class Store {
     rawStart: Point;
     rawEnd: Point;
     pathD: string;
-    startDirection: Point;
-    endDirection: Point;
+    startDirection: { dx: number; dy: number };
+    endDirection: { dx: number; dy: number };
   } | null {
     // 直接调用 generateConnectionPath（不再经过 computeConnectionPath）
     return generateConnectionPath(conn, this.getNode.bind(this), this.getAnchor.bind(this));
@@ -263,7 +264,17 @@ export class Store {
 
   updateAllConnections(updates: Partial<Connection>): void {
     for (const [id, conn] of this.connections) {
-      Object.assign(conn, updates);
+      // 处理嵌套对象：arrow
+      if (updates.arrow && typeof updates.arrow === 'object') {
+        conn.arrow = { ...(conn.arrow || {}), ...updates.arrow };
+      }
+      // 处理嵌套对象：label（如果将来需要）
+      if (updates.label && typeof updates.label === 'object') {
+        conn.label = { ...(conn.label || {}), ...updates.label };
+      }
+      // 处理其他顶层属性
+      const { arrow, label, ...rest } = updates;
+      Object.assign(conn, rest);
     }
     this.notify('connection');
   }
@@ -277,9 +288,12 @@ export class Store {
 
   // ---- z-index ----
   private getMaxZIndex(): number {
-    let max = Defaults.zIndexBase - 1;
+    let max = Defaults.zIndexBase - 1; // 初始值
     for (const node of this.nodes.values()) {
       if (node.zIndex !== undefined && node.zIndex > max) max = node.zIndex;
+    }
+    for (const anchor of this.anchors.values()) {
+      if (anchor.zIndex !== undefined && anchor.zIndex > max) max = anchor.zIndex;
     }
     for (const conn of this.connections.values()) {
       if (conn.zIndex !== undefined && conn.zIndex > max) max = conn.zIndex;

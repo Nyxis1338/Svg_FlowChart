@@ -66,6 +66,7 @@ export interface Anchor {
   strokeWidth?: string;
   offset?: Point;
   visible?: boolean;
+  zIndex?: number;
   data?: Record<string, unknown>;
 }
 

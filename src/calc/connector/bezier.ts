@@ -1,6 +1,13 @@
 // src/calc/connector/bezier.ts
 
 import type { Point } from '../../types/geometry';
+import { Geometry } from '../geometry';
+
+export interface BezierResult {
+  path: string;
+  startDirection: { dx: number; dy: number };
+  endDirection: { dx: number; dy: number };
+}
 
 /**
  * 贝塞尔曲线连接器（三次贝塞尔曲线）
@@ -13,10 +20,20 @@ import type { Point } from '../../types/geometry';
  * @returns SVG 路径字符串，例如 "M 10 20 C 30 20, 80 100, 100 100"
  */
 
-export function connectorBezier(start: Point, end: Point, offsetFactor: number = 0.5, minOffset: number = 40): string {
+export function connectorBezier(
+  start: Point,
+  end: Point,
+  offsetFactor: number = 0.5,
+  minOffset: number = 40
+): BezierResult {
   const dx = end.x - start.x;
   const offset = Math.max(Math.abs(dx) * offsetFactor, minOffset);
   const cp1: Point = { x: start.x + offset, y: start.y };
   const cp2: Point = { x: end.x - offset, y: end.y };
-  return `M ${start.x} ${start.y} C ${cp1.x} ${cp1.y}, ${cp2.x} ${cp2.y}, ${end.x} ${end.y}`;
+  const path = `M ${start.x} ${start.y} C ${cp1.x} ${cp1.y}, ${cp2.x} ${cp2.y}, ${end.x} ${end.y}`;
+  return {
+    path,
+    startDirection: Geometry.direction(cp1, start), // 反向
+    endDirection: Geometry.direction(cp2, end),
+  };
 }

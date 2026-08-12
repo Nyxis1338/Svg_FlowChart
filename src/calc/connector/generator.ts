@@ -9,11 +9,12 @@ import { getAnchorOrientation } from '../anchor/orientation';
 import { connectorStraight } from './straight';
 import { connectorBezier } from './bezier';
 import { connectorFlowchart } from './flowchart';
-import { direction } from '../geometry';
+import { Geometry } from '../geometry';
 
 /**
  * 生成完整的连线路径
- * 路径结构：rawStart → stubStart → start → (连接器) → end → stubEnd → rawEnd
+ * 路径结构：   rawStart → stubStart → start → (连接器) → end → stubEnd → rawEnd
+ * 点间距离(*归一化)：   gap         stub                    stub       gap
  */
 export function generateConnectionPath(
   conn: Connection,
@@ -21,8 +22,8 @@ export function generateConnectionPath(
   getAnchor: (id: string) => Anchor | undefined
 ): {
   pathD: string;
-  startDirection: Point;
-  endDirection: Point;
+  startDirection: { dx: number; dy: number };
+  endDirection: { dx: number; dy: number };
   rawStart: Point;
   rawEnd: Point;
   start: Point;
@@ -68,21 +69,23 @@ export function generateConnectionPath(
   };
 
   // 4. 方向向量（用于箭头）
-  const startDirection = direction(start, rawStart);
-  const endDirection = direction(end, rawEnd);
-
   // 5. 生成连接器路径（start → end）
+  // 放在一起 是因为方向向量 会根据不同的connectorType 得到不同的值
   const connectorType = conn.connectorType ?? Defaults.connection.connectorType;
   const typeStr = typeof connectorType === 'string' ? connectorType : connectorType;
 
-  let connectorPath: string;
-  if (typeStr === 'straight') {
-    connectorPath = connectorStraight(start, end);
+  let connectorResult: { path: string; startDirection: any; endDirection: any };
+
+  if (typeStr === 'flowchart') {
+    connectorResult = connectorFlowchart(start, end);
   } else if (typeStr === 'bezier') {
-    connectorPath = connectorBezier(start, end);
+    connectorResult = connectorBezier(start, end);
   } else {
-    connectorPath = connectorFlowchart(start, end, sourceOrient, targetOrient);
+    connectorResult = connectorStraight(start, end);
   }
+  const connectorPath = connectorResult.path;
+  const startDirection = connectorResult.startDirection;
+  const endDirection = connectorResult.endDirection;
 
   // 6. 将 connectorPath 的第一个 "M" 替换为 "L"
   // 因为完整路径的第一个 M 由 rawStart 提供

@@ -45,6 +45,8 @@ export class SvgRenderer {
     }
     this.connectionRenderer.render(this.reconnectingIds);
     this.nodeRenderer.render(); // 同时渲染节点和锚点
+    // 需要添加排序！
+    this.sortElementsByZIndex();
   }
 
   setReconnecting(connId: string, isReconnecting: boolean): void {
@@ -74,6 +76,18 @@ export class SvgRenderer {
 
   highlightAnchor(anchorId: string, highlight: boolean): void {
     this.nodeRenderer.highlightAnchor(anchorId, highlight);
+  }
+
+  private sortElementsByZIndex(): void {
+    const children = Array.from(this.layerManager.elementLayer.children) as SVGElement[];
+    children.sort((a, b) => {
+      const za = parseInt(a.dataset['zIndex'] ?? '100', 10);
+      const zb = parseInt(b.dataset['zIndex'] ?? '100', 10);
+      return za - zb;
+    });
+    for (const child of children) {
+      this.layerManager.elementLayer.appendChild(child);
+    }
   }
 
   destroy(): void {

@@ -22,6 +22,13 @@ export class HitTest {
       const node = store.getNode(ap.nodeId);
       if (!node) continue;
       const pos = store.calcAnchorPosForNode(node, ap);
+      // 角锚点使用更大的检测半径
+      const isCorner =
+        (ap.position?.includes('top') && ap.position?.includes('left')) ||
+        (ap.position?.includes('top') && ap.position?.includes('right')) ||
+        (ap.position?.includes('bottom') && ap.position?.includes('left')) ||
+        (ap.position?.includes('bottom') && ap.position?.includes('right'));
+      const radius = isCorner ? hitRadius * 1.5 : hitRadius;
       const dist = Math.hypot(point.x - pos.x, point.y - pos.y);
       if (dist < minDist) {
         minDist = dist;

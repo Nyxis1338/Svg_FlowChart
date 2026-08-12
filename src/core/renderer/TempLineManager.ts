@@ -49,13 +49,14 @@ export class TempLineManager {
 
     let pathD: string;
     if (connectorType === 'flowchart') {
-      const srcOrient = orientation || { dx: 0, dy: 1 };
-      const tgtOrient = { dx: 0, dy: -1 };
-      pathD = connectorFlowchart(start, end, srcOrient, tgtOrient);
+      const result = connectorFlowchart(start, end);
+      pathD = result.path;
     } else if (connectorType === 'bezier') {
-      pathD = connectorBezier(start, end);
+      const result = connectorBezier(start, end);
+      pathD = result.path;
     } else {
-      pathD = connectorStraight(start, end);
+      const result = connectorStraight(start, end);
+      pathD = result.path;
     }
 
     this.pathEl!.setAttribute('d', pathD);

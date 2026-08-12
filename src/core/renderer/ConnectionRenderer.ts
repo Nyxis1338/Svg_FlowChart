@@ -6,7 +6,7 @@ import type { Connection, LabelConfig, ArrowConfig } from '../../types/SvgModel'
 import type { Point } from '../../types/geometry';
 import { createSvgElement } from '../../utils/dom';
 import { Defaults } from '../../styles/defaults';
-import { direction } from '../../calc/geometry';
+import { Geometry } from '../../calc/geometry';
 
 export class ConnectionRenderer {
   constructor(
@@ -25,7 +25,11 @@ export class ConnectionRenderer {
       if (skipIds && skipIds.has(conn.id)) continue;
       const pathInfo = this.store.computeConnectionPath(conn);
       if (!pathInfo) continue;
-      const { start, end, rawStart, rawEnd, pathD, startDirection, endDirection } = pathInfo;
+      // 解构时只保留需要的字段
+      const { start, end, pathD, startDirection, endDirection } = pathInfo;
+
+      // console.log('startDirection : ', startDirection);
+      // console.log('endDirection : ', endDirection);
 
       const g = createSvgElement('g') as SVGGElement;
       g.dataset['connectionId'] = conn.id;
@@ -47,18 +51,18 @@ export class ConnectionRenderer {
       path.setAttribute('stroke-linejoin', Defaults.connection.strokeLinejoin);
       g.appendChild(path);
 
-      // ---- 箭头：绘制在连接器末端，方向沿连接器方向 ----
+      // ---- 箭头 ----
       if (conn.arrow && conn.arrow.direction !== 'none') {
         const arrow = conn.arrow;
         // 目标端箭头：位置在 end，方向为 start→end
         if (arrow.direction === 'target' || arrow.direction === 'both') {
-          const dir = direction(start, end);
+          const dir = Geometry.normalizeDirection(endDirection);
           const arrowEl = this.renderArrow(arrow, end, dir, strokeColor);
           if (arrowEl) g.appendChild(arrowEl);
         }
         // 源端箭头：位置在 start，方向为 end→start
         if (arrow.direction === 'source' || arrow.direction === 'both') {
-          const dir = direction(end, start);
+          const dir = Geometry.normalizeDirection(startDirection);
           const arrowEl = this.renderArrow(arrow, start, dir, strokeColor);
           if (arrowEl) g.appendChild(arrowEl);
         }
@@ -77,15 +81,22 @@ export class ConnectionRenderer {
   /**
    * 绘制单个箭头（三角形或三叉）
    */
-  private renderArrow(arrow: ArrowConfig, tip: Point, dir: Point, color: string): SVGPathElement | null {
+  private renderArrow(
+    arrow: ArrowConfig,
+    tip: Point,
+    dir: { dx: number; dy: number },
+    color: string
+  ): SVGPathElement | null {
     const length = arrow.length || Defaults.arrow.length;
     const width = arrow.width || Defaults.arrow.width;
     const type = arrow.type || Defaults.arrow.type;
 
-    const len = Math.hypot(dir.x, dir.y);
-    if (len < 0.001) return null;
-    const dx = dir.x / len;
-    const dy = dir.y / len;
+    // 使用 Geometry.normalizeDirection 替代手写归一化
+    const norm = Geometry.normalizeDirection(dir);
+    if (norm.dx === 0 && norm.dy === 0) return null;
+
+    const dx = norm.dx;
+    const dy = norm.dy;
 
     // 底边中点
     const base = {
@@ -107,14 +118,14 @@ export class ConnectionRenderer {
     let d = '';
 
     if (type === 'fork') {
-      // 三叉：从 base 到 left 和 right 两条线
-      d += `M ${base.x.toFixed(2)} ${base.y.toFixed(2)} L ${left.x.toFixed(2)} ${left.y.toFixed(2)} `;
-      d += `M ${base.x.toFixed(2)} ${base.y.toFixed(2)} L ${right.x.toFixed(2)} ${right.y.toFixed(2)} `;
+      // 两条斜线从 tip 到 left 和 right
+      d =
+        `M ${tip.x.toFixed(2)} ${tip.y.toFixed(2)} L ${left.x.toFixed(2)} ${left.y.toFixed(2)} ` +
+        `M ${tip.x.toFixed(2)} ${tip.y.toFixed(2)} L ${right.x.toFixed(2)} ${right.y.toFixed(2)}`;
       arrowPath.setAttribute('stroke', color);
       arrowPath.setAttribute('stroke-width', String(width / 3));
       arrowPath.setAttribute('fill', 'none');
     } else {
-      // 三角形：填充
       d += `M ${tip.x.toFixed(2)} ${tip.y.toFixed(2)} L ${left.x.toFixed(2)} ${left.y.toFixed(2)} L ${right.x.toFixed(2)} ${right.y.toFixed(2)} Z`;
       arrowPath.setAttribute('fill', color);
       arrowPath.setAttribute('stroke', 'none');
@@ -125,9 +136,6 @@ export class ConnectionRenderer {
     return arrowPath;
   }
 
-  /**
-   * 渲染文字标签
-   */
   private renderLabel(
     label: LabelConfig,
     pathInfo: { start: Point; end: Point; pathD: string }

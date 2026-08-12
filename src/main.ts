@@ -64,12 +64,13 @@ function safeAddConnection(store: any, sourceAnchor: any, targetAnchor: any, pro
     console.warn('跳过连线：缺少源锚点或目标锚点', { sourceAnchor, targetAnchor });
     return;
   }
-  store.addConnection({
+  const conn = store.addConnection({
     id: crypto.randomUUID(),
     sourceAnchorId: sourceAnchor.id,
     targetAnchorId: targetAnchor.id,
     ...props,
   });
+  return conn;
 }
 
 // ==================== 初始化画布 ====================
@@ -77,6 +78,7 @@ const appDom = document.getElementById('canvas-container')!;
 const chart = new SvgEngine(appDom);
 (window as any).chart = chart;
 const store = chart.store;
+(window as any).store = chart.store;
 
 // ==================== 创建节点 ====================
 const nodeA = chart.addNode({
@@ -126,7 +128,7 @@ addDefaultAnchors(chart, nodeD.id);
 // ==================== 创建连线 ====================
 const aRightOut = getAnchor(store, nodeA.id, 'right', 'output');
 const bLeftIn = getAnchor(store, nodeB.id, 'left', 'input');
-safeAddConnection(store, aRightOut, bLeftIn, {
+(window as any).conn1 = safeAddConnection(store, aRightOut, bLeftIn, {
   connectorType: 'flowchart',
   stroke: randomColor(),
   strokeWidth: 2,
@@ -136,7 +138,7 @@ safeAddConnection(store, aRightOut, bLeftIn, {
 
 const aTopOut = getAnchor(store, nodeA.id, 'top', 'output');
 const cLeftIn = getAnchor(store, nodeC.id, 'left', 'input');
-safeAddConnection(store, aTopOut, cLeftIn, {
+(window as any).conn2 = safeAddConnection(store, aTopOut, cLeftIn, {
   connectorType: 'straight',
   stroke: randomColor(),
   strokeWidth: 2,
@@ -146,7 +148,7 @@ safeAddConnection(store, aTopOut, cLeftIn, {
 
 const bRightOut = getAnchor(store, nodeB.id, 'right', 'output');
 const dLeftIn = getAnchor(store, nodeD.id, 'left', 'input');
-safeAddConnection(store, bRightOut, dLeftIn, {
+(window as any).conn3 = safeAddConnection(store, bRightOut, dLeftIn, {
   connectorType: 'bezier',
   stroke: randomColor(),
   strokeWidth: 2,
@@ -156,7 +158,7 @@ safeAddConnection(store, bRightOut, dLeftIn, {
 
 const dTopOut = getAnchor(store, nodeD.id, 'top', 'output');
 const cBottomIn = getAnchor(store, nodeC.id, 'bottom', 'input');
-safeAddConnection(store, dTopOut, cBottomIn, {
+(window as any).conn4 = safeAddConnection(store, dTopOut, cBottomIn, {
   connectorType: 'flowchart',
   stroke: randomColor(),
   strokeWidth: 2,
@@ -216,7 +218,7 @@ console.log('  左键拖拽节点：移动');
 console.log('  从锚点拖拽：创建连线 / 重连已有连线');
 console.log('  Delete/Backspace：删除选中元素');
 console.log('  ESC：取消拖拽');
-console.log('📦 全局对象 chart, nodeA, nodeB, nodeC, nodeD 已挂载，可调试');
+console.log('📦 全局对象 chart, nodeA, nodeB, nodeC, nodeD ,conn1,...conn4 已挂载，可调试');
 console.log('💡 点击任意锚点，控制台将输出其详细信息');
 
 // ==================== UI 按钮 ====================
