@@ -1,7 +1,7 @@
 // src/main.ts
 
 import { SvgEngine } from './core/SvgEngine';
-import { ConnectorColors } from './styles/defaults';
+import { ConnectorColors } from './utils/colors';
 import { NodeShape } from './types/SvgModel';
 
 function randomColor(): string {

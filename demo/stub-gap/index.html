@@ -67,13 +67,9 @@
     <div id="container"></div>
     <div id="log">初始化... 拖动节点观察 stub 和箭头</div>
 
-    <script type="importmap">
-      { "imports": { "svg-flowchart": "../../src/" } }
-    </script>
-    <script type="module">
-      import { SvgEngine } from '../../src/core/SvgEngine';
-      import { Defaults } from '../../src/styles/defaults';
-
+    <script src="../../dist/svgflow.umd.js"></script>
+    <script>
+      const { SvgEngine, Defaults } = window.SvgFlow;
       const container = document.getElementById('container');
       const SE = new SvgEngine(container);
       window.SE = SE;

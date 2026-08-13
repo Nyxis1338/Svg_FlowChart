@@ -1,236 +1,229 @@
-# Svg_FlowChart
+# SVG Flow Chart
 
-原生 TypeScript + SVG 自研流程图引擎，无第三方绘图库依赖，轻量且可扩展。借鉴 jsPlumb 设计思路，实现节点、锚点、连线的完整交互与渲染。
+一个轻量级、开箱即用的 SVG 流程图绘制引擎，支持节点拖拽、连线创建、样式定制等核心功能。
 
-## 功能特性
+---
 
-- ✅ 全屏无限网格画布，支持平移（空格+拖拽）与滚轮缩放
-- ✅ 多种节点形状：矩形、圆形、菱形、椭圆
-- ✅ 固定锚点（`static`）与连续锚点（`perimeter`，不可见但可交互）
-- ✅ 三种连线类型：直线（`straight`）、贝塞尔曲线（`bezier`）、流程图折线（`flowchart`）
-- ✅ 连线支持文本标签与方向箭头（起点/终点/双向）
-- ✅ 数据驱动渲染（`Store` 变更自动重绘）
-- ✅ 节点拖拽移动，连线自动跟随
-- ✅ 锚点拖拽创建连线，悬停高亮，磁吸吸附
-- ✅ 选中、删除（Delete/Backspace）节点或连线
-- ✅ 视图控制（放大/缩小/重置/适配）
-- ✅ 右键菜单（新增/复制/删除）
-- ✅ 数据序列化（导入/导出 JSON）
-- ✅ 完整 TypeScript 类型支持
+## ✨ 特性
 
-## 快速启动
+- 🎯 **开箱即用**：无需复杂配置，直接引入即可使用
+- 🎨 **4 种节点形状**：矩形、圆形、菱形、椭圆
+- 🔗 **3 种连线类型**：直线、贝塞尔曲线、流程图正交折线
+- 📍 **8 个锚点方向**：上下左右及四个角，支持双向连接
+- 🖱️ **交互完整**：节点拖拽、连线拖拽创建/重连、右键菜单
+- 🎭 **箭头样式**：三角形箭头、三叉箭头
+- 📐 **Stub 垂直引出**：连线从节点边缘沿法线方向垂直引出
+- 🎨 **样式定制**：批量更新节点/连线/锚点样式
+- 📦 **UMD 打包**：支持 `<script>` 标签直接引入
+- ⚡ **轻量高效**：纯 TypeScript 编写，无第三方依赖
+
+---
+
+## 🚀 快速开始
+
+### 安装
 
 ```bash
-git clone https://github.com/Nyxis1338/Svg_FlowChart
-cd Svg_FlowChart
+npm install svg-flow-chart
+```
+
+### 使用（ES Module）
+
+```typescript
+import { SvgEngine } from 'svg-flow-chart';
+
+const container = document.getElementById('container');
+const engine = new SvgEngine(container);
+
+// 创建节点
+const nodeA = engine.addNode({
+  x: 100,
+  y: 100,
+  width: 140,
+  height: 90,
+  label: '开始',
+  shape: 'rectangle',
+});
+
+// 创建锚点
+engine.addAnchor({
+  nodeId: nodeA.id,
+  position: 'right',
+  radius: 5,
+});
+
+// 创建连线
+engine.addConnection({
+  sourceAnchorId: anchorA.id,
+  targetAnchorId: anchorB.id,
+  connectorType: 'flowchart',
+  stroke: '#27ae60',
+  arrow: { direction: 'target', length: 12, type: 'triangle' },
+});
+```
+
+### 使用（UMD）
+
+```html
+<script src="dist/svgflow.umd.js"></script>
+<script>
+  const { SvgEngine } = window.SvgFlow;
+  const engine = new SvgEngine(document.getElementById('container'));
+  // ... 同上
+</script>
+```
+
+---
+
+## 🎨 核心 API
+
+### 节点操作
+
+```typescript
+// 添加节点
+const node = engine.addNode({
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  label?: string,
+  shape?: 'rectangle' | 'circle' | 'diamond' | 'ellipse',
+  fill?: string,
+  stroke?: string,
+  strokeWidth?: number,
+});
+
+// 获取/更新/删除节点
+engine.getNode(id);
+engine.updateNode(id, updates);
+engine.removeNode(id);
+```
+
+### 锚点操作
+
+```typescript
+// 添加锚点
+engine.addAnchor({
+  nodeId: string,
+  position: 'top' | 'right' | 'bottom' | 'left' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right',
+  radius?: number,
+  fill?: string,
+  stroke?: string,
+});
+
+engine.getNodeAnchors(nodeId);
+engine.removeAnchor(id);
+```
+
+### 连线操作
+
+```typescript
+// 添加连线
+engine.addConnection({
+  sourceAnchorId: string,
+  targetAnchorId: string,
+  connectorType: 'straight' | 'bezier' | 'flowchart',
+  stroke?: string,
+  strokeWidth?: number,
+  stub?: number,     // stub 长度
+  gap?: number,      // 间隙
+  arrow?: {
+    direction: 'none' | 'source' | 'target' | 'both',
+    type?: 'triangle' | 'fork',
+    length?: number,
+    width?: number,
+    color?: string,
+  },
+  label?: {
+    text: string,
+    fontSize?: number,
+    color?: string,
+    offset?: { x: number; y: number },
+  },
+});
+
+engine.updateConnection(id, updates);
+engine.removeConnection(id);
+```
+
+### 批量更新
+
+```typescript
+// 批量更新所有节点/连线/锚点样式
+engine.updateAllNodes({ fill: '#ffcccc' });
+engine.updateAllConnections({ stroke: '#4caf50' });
+engine.updateAllAnchors({ radius: 8 });
+```
+
+### 视图控制
+
+```typescript
+engine.zoomIn(); // 放大
+engine.zoomOut(); // 缩小
+engine.zoomTo(1.5); // 缩放到指定比例
+engine.resetView(); // 重置视图
+engine.fitToView(30); // 适配所有节点
+```
+
+### 导入/导出
+
+```typescript
+const data = engine.exportData(); // 导出 JSON
+engine.importData(data); // 导入 JSON
+```
+
+---
+
+## 🎨 默认配色
+
+| 元素     | 颜色   | 色值      |
+| :------- | :----- | :-------- |
+| 节点边框 | 海洋蓝 | `#2980b9` |
+| 锚点     | 蓝紫色 | `#5470c6` |
+| 连线     | 舒适绿 | `#27ae60` |
+| 箭头     | 舒适绿 | `#27ae60` |
+
+可通过 `Defaults` 全局修改：
+
+```typescript
+import { Defaults } from 'svg-flow-chart';
+
+Defaults.node.stroke = '#your-color';
+Defaults.connection.stroke = '#your-color';
+```
+
+---
+
+## 🧪 示例
+
+- [主示例](http://localhost:5173/) — 基础功能展示
+- [批量更新](http://localhost:5173/demo/batch-update/index.html) — 样式批量更新
+- [Stub 演示](http://localhost:5173/demo/stub-demo/index.html) — stub 垂直引出
+- [Stub + 多形状](http://localhost:5173/demo/stub-gap/index.html) — 多种节点形状 + stub
+
+---
+
+## 📦 构建
+
+```bash
 npm install
-npm run dev
+npm run build
 ```
 
-浏览器访问 http://localhost:5173 即可看到测试页面。
+生成 `dist/svgflow.umd.js`，可直接在浏览器中使用。
 
-项目结构及文件说明
+---
 
-```
-Svg_FlowChart/
-├── index.html                # 测试页面，包含工具栏与画布容器
-├── package.json              # 项目依赖（Vite + TypeScript）
-├── tsconfig.json             # TypeScript 编译配置
-├── assets/
-│   └── style.css             # 全局样式（可选）
-├── src/
-│   ├── main.ts               # 入口文件：初始化画布，创建测试数据，绑定UI按钮
-│   │
-│   ├── types/                # 类型定义（全局共享）
-│   │   ├── geometry.ts       # Point, Rect 基础几何接口
-│   │   ├── SvgModel.ts       # 核心数据模型：Node, Anchor, Connection, 枚举等
-│   │   └── index.ts          # 统一导出
-│   │
-│   ├── calc/                 # 纯函数计算模块（无状态，可独立测试）
-│   │   ├── geometry.ts       # 几何工具集：距离、投影、矩形边缘、周长计算等
-│   │   ├── anchor/           # 锚点位置计算
-│   │   │   ├── base.ts       # 抽象基类（可扩展）
-│   │   │   ├── static.ts     # 固定锚点（上/右/下/左/中心）
-│   │   │   ├── perimeter.ts  # 周边均分锚点（沿矩形周长均匀分布）
-│   │   │   ├── continuous.ts # 连续锚点（根据两节点相对位置动态计算最佳边缘点）
-│   │   │   └── index.ts      # 统一导出 getStaticAnchor, getPerimeterAnchor, getContinuousAnchorPair
-│   │   └── connector/        # 连线路径生成
-│   │       ├── base.ts       # 抽象基类
-│   │       ├── straight.ts   # 直线路径
-│   │       ├── bezier.ts     # 三次贝塞尔曲线
-│   │       ├── flowchart.ts  # 流程图折线（直角正交）
-│   │       └── index.ts      # 导出 generatePath 和 generatePathWithOptions
-│   │
-│   ├── core/                 # 核心业务模块
-│   │   ├── SvgEngine.ts   # **主入口类**：聚合所有子模块，对外暴露统一 API（节点/连线/锚点 CRUD，视图控制，导入/导出，销毁）
-│   │   │
-│   │   ├── store/            # 数据仓库（状态管理）
-│   │   │   └── SvgStore.ts   # 存储节点、锚点、连线数据，提供增删改查，发布订阅（notify），以及连线路径计算（computeConnectionPath）
-│   │   │
-│   │   ├── renderer/         # SVG 渲染器
-│   │   │   └── SvgRenderer.ts # 订阅 Store 和 Selection，渲染节点（多种形状）、锚点（static 可见 / perimeter 透明交互）、连线（路径+标签+箭头），临时虚线，右键菜单
-│   │   │
-│   │   ├── viewport/         # 视口控制（平移/缩放）
-│   │   │   └── ViewportManager.ts # 管理 SVG 的 contentGroup 变换（translate/scale），实现空格拖拽平移、滚轮缩放，坐标转换（screenToCanvas/canvasToScreen）
-│   │   │
-│   │   ├── interaction/      # 交互逻辑
-│   │   │   └── DragManager.ts # 处理节点拖拽、锚点拖拽创建连线、连线重连，鼠标/键盘事件（ESC取消，Delete删除），锚点悬停高亮
-│   │   │
-│   │   └── selection/        # 选中管理
-│   │       └── SelectionManager.ts # 维护当前选中的类型（node/connection）和 ID，提供订阅通知，供渲染器高亮使用
-│   │
-│   └── utils/                # 工具函数
-│       ├── dom.ts            # SVG 元素创建、右键菜单构建、DOM 操作辅助
-│       └── uuid.ts           # 生成唯一 ID（uuidv4 / shortId）
-│
-└── README.md                 # 项目说明文档
-```
-
-### 核心数据模型（SvgModel.ts 简览）
-
-Node：节点，包含位置、尺寸、形状、样式、标签、锚点 ID 列表。
-
-Anchor：锚点（端点），分为 static（固定位置）和 perimeter（连续动态）。static 锚点可见，perimeter 锚点透明但可交互。
-
-Connection：连线，包含类型（straight/bezier/flowchart）、源/目标锚点 ID（或节点 ID 用于连续锚点）、样式、标签配置、箭头配置。
-
-### 常用 API（通过 SvgEngine 实例调用）
-
-```
-const chart = new SvgEngine(container);
-
-// 节点操作
-chart.addNode({ x, y, width, height, label, shape, fill, stroke });
-chart.getNode(id);
-chart.getAllNodes();
-chart.updateNode(id, partial);
-chart.removeNode(id);
-
-// 连线操作
-chart.addConnection({ sourceAnchorId, targetAnchorId, connectorType, stroke, label, arrow });
-chart.getConnection(id);
-chart.getAllConnections();
-chart.updateConnection(id, partial);
-chart.removeConnection(id);
-
-// 锚点操作
-chart.addAnchor({ nodeId, anchorMode, staticType, direction, radius, ... });
-chart.getAllAnchors();
-chart.getNodeAnchors(nodeId);
-chart.removeAnchor(id);
-
-// 视图控制
-chart.zoomIn(factor);
-chart.zoomOut(factor);
-chart.zoomTo(scale);
-chart.resetView();
-chart.fitToView(padding);
-
-// 数据导入导出
-const data = chart.exportData();
-chart.importData(data);
-
-// 销毁
-chart.destroy();
-```
-
-### 操作快捷键
-
-| 操作                | 说明                         |
-| ------------------- | ---------------------------- |
-| 空格 + 鼠标左键拖拽 | 平移画布                     |
-| 鼠标滚轮            | 缩放画布                     |
-| 左键拖拽节点        | 移动节点                     |
-| 从锚点拖拽          | 创建连线（拖到另一锚点释放） |
-| Delete / Backspace  | 删除选中的节点或连线         |
-| ESC                 | 取消当前拖拽操作             |
-
-### 开发计划
-
-□ 支持撤销/重做（Undo/Redo）
-□ 支持多选与框选
-□ 连线路径优化（避免穿越节点）
-□ 对齐线与智能吸附
-□ 主题定制（颜色/字体）
-
-### 技术栈
-
-Vite（构建工具）
-
-TypeScript（类型安全）
-
-原生 SVG（无第三方绘图库）
-
-### License
+## 📝 License
 
 MIT
 
-```
-Svg_FlowChart
-├─ .prettierrc
-├─ 1.md
-├─ assets
-│  └─ style.css
-├─ demo
-│  ├─ batch-update
-│  │  └─ index.html
-│  ├─ connection-handle
-│  │  └─ index.html
-│  ├─ continuous-edge
-│  │  └─ index.html
-│  └─ stub-demo
-│     └─ index.html
-├─ index.html
-├─ package-lock.json
-├─ package.json
-├─ README.md
-├─ src
-│  ├─ calc
-│  │  ├─ anchor
-│  │  │  ├─ continuous.ts
-│  │  │  ├─ index.ts
-│  │  │  ├─ perimeter.ts
-│  │  │  ├─ position.ts
-│  │  │  └─ static.ts
-│  │  ├─ connector
-│  │  │  ├─ bezier.ts
-│  │  │  ├─ flowchart.ts
-│  │  │  ├─ generator.ts
-│  │  │  ├─ index.ts
-│  │  │  ├─ path.ts
-│  │  │  └─ straight.ts
-│  │  ├─ geometry.ts
-│  │  └─ index.ts
-│  ├─ core
-│  │  ├─ interaction
-│  │  │  ├─ ContextMenu.ts
-│  │  │  ├─ DragManager.ts
-│  │  │  ├─ EventBus.ts
-│  │  │  └─ HitTest.ts
-│  │  ├─ renderer
-│  │  │  ├─ AnchorRenderer.ts
-│  │  │  ├─ ConnectionRenderer.ts
-│  │  │  ├─ LayerManager.ts
-│  │  │  ├─ NodeRenderer.ts
-│  │  │  └─ SvgRenderer.ts
-│  │  ├─ selection
-│  │  │  └─ SelectionManager.ts
-│  │  ├─ store
-│  │  │  └─ Store.ts
-│  │  ├─ SvgEngine.ts
-│  │  └─ viewport
-│  │     └─ ViewportManager.ts
-│  ├─ main.ts
-│  ├─ styles
-│  │  └─ defaults.ts
-│  ├─ types
-│  │  ├─ geometry.ts
-│  │  ├─ index.ts
-│  │  └─ SvgModel.ts
-│  └─ utils
-│     ├─ anchor-helpers.ts
-│     └─ dom.ts
-├─ ts.md
-└─ tsconfig.json
+---
 
-```
+## 🤝 贡献
+
+欢迎提交 Issue 和 Pull Request！
+
+---
+
+**Made with ❤️**

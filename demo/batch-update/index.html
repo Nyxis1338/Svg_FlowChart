@@ -135,12 +135,22 @@
     </div>
     <div id="log">就绪</div>
 
-    <script type="importmap">
-      { "imports": { "svg-flowchart": "../../src/" } }
-    </script>
-    <script type="module">
-      import { SvgEngine } from '../../src/core/SvgEngine';
-      import { ConnectorColors } from '../../src/styles/defaults';
+    <script src="../../dist/svgflow.umd.js"></script>
+    <script>
+      // 从 UMD 全局获取 SvgEngine
+      const { SvgEngine } = window.SvgFlow;
+
+      // 本地定义颜色数组（与 defaults.ts 保持一致）
+      const ConnectorColors = [
+        '#5b6c7d', // 蓝灰
+        '#e74c3c', // 红
+        '#2ecc71', // 绿
+        '#f39c12', // 橙
+        '#9b59b6', // 紫
+        '#1abc9c', // 青
+        '#e67e22', // 橙红
+        '#3498db', // 蓝
+      ];
 
       const container = document.getElementById('canvas-wrap');
       const SE = new SvgEngine(container);
