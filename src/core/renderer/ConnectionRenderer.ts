@@ -57,13 +57,13 @@ export class ConnectionRenderer {
         // 目标端箭头：位置在 end，方向为 start→end
         if (arrow.direction === 'target' || arrow.direction === 'both') {
           const dir = Geometry.normalizeDirection(endDirection);
-          const arrowEl = this.renderArrow(arrow, end, dir, strokeColor);
+          const arrowEl = this.renderArrow(arrow, end, dir, arrow.color || strokeColor);
           if (arrowEl) g.appendChild(arrowEl);
         }
         // 源端箭头：位置在 start，方向为 end→start
         if (arrow.direction === 'source' || arrow.direction === 'both') {
           const dir = Geometry.normalizeDirection(startDirection);
-          const arrowEl = this.renderArrow(arrow, start, dir, strokeColor);
+          const arrowEl = this.renderArrow(arrow, start, dir, arrow.color || strokeColor);
           if (arrowEl) g.appendChild(arrowEl);
         }
       }

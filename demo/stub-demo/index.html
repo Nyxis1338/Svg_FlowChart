@@ -74,9 +74,8 @@
       import { Defaults } from '../../src/styles/defaults';
 
       const container = document.getElementById('container');
-      const chart = new SvgEngine(container);
-      window.chart = chart;
-      const store = chart.store;
+      const SE = new SvgEngine(container);
+      window.SE = SE;
       const logEl = document.getElementById('log');
 
       function log(msg) {
@@ -84,40 +83,16 @@
         console.log(msg);
       }
 
-      // ---- 辅助：添加四个方向锚点 ----
+      // ---- 辅助：添加四个方向锚点（全部 both） ----
       function addAnchors(nodeId) {
-        chart.addAnchor({
-          nodeId,
-
-          position: 'top',
-          direction: 'output',
-          radius: 5,
-        });
-        chart.addAnchor({
-          nodeId,
-
-          position: 'right',
-          direction: 'output',
-          radius: 5,
-        });
-        chart.addAnchor({
-          nodeId,
-
-          position: 'bottom',
-          direction: 'input',
-          radius: 5,
-        });
-        chart.addAnchor({
-          nodeId,
-
-          position: 'left',
-          direction: 'input',
-          radius: 5,
-        });
+        SE.addAnchor({ nodeId, position: 'top', radius: 5 });
+        SE.addAnchor({ nodeId, position: 'right', radius: 5 });
+        SE.addAnchor({ nodeId, position: 'bottom', radius: 5 });
+        SE.addAnchor({ nodeId, position: 'left', radius: 5 });
       }
 
       // ---- 创建四个节点 ----
-      const nodeA = chart.addNode({
+      const nodeA = SE.addNode({
         x: 60,
         y: 60,
         width: 140,
@@ -129,7 +104,7 @@
       });
       addAnchors(nodeA.id);
 
-      const nodeB = chart.addNode({
+      const nodeB = SE.addNode({
         x: 360,
         y: 60,
         width: 140,
@@ -141,7 +116,7 @@
       });
       addAnchors(nodeB.id);
 
-      const nodeC = chart.addNode({
+      const nodeC = SE.addNode({
         x: 200,
         y: 260,
         width: 140,
@@ -153,7 +128,7 @@
       });
       addAnchors(nodeC.id);
 
-      const nodeD = chart.addNode({
+      const nodeD = SE.addNode({
         x: 480,
         y: 260,
         width: 140,
@@ -166,10 +141,10 @@
       addAnchors(nodeD.id);
 
       // ---- 1. 直线（红色） ----
-      const aRight = store.getNodeAnchors(nodeA.id).find(a => a.position === 'right');
-      const bLeft = store.getNodeAnchors(nodeB.id).find(a => a.position === 'left');
+      const aRight = SE.getNodeAnchors(nodeA.id).find(a => a.position === 'right');
+      const bLeft = SE.getNodeAnchors(nodeB.id).find(a => a.position === 'left');
       if (aRight && bLeft) {
-        chart.addConnection({
+        SE.addConnection({
           connectorType: 'straight',
           sourceAnchorId: aRight.id,
           targetAnchorId: bLeft.id,
@@ -182,10 +157,10 @@
       }
 
       // ---- 2. 流程图（绿色） ----
-      const aBottom = store.getNodeAnchors(nodeA.id).find(a => a.position === 'bottom');
-      const cTop = store.getNodeAnchors(nodeC.id).find(a => a.position === 'top');
+      const aBottom = SE.getNodeAnchors(nodeA.id).find(a => a.position === 'bottom');
+      const cTop = SE.getNodeAnchors(nodeC.id).find(a => a.position === 'top');
       if (aBottom && cTop) {
-        chart.addConnection({
+        SE.addConnection({
           connectorType: 'flowchart',
           sourceAnchorId: aBottom.id,
           targetAnchorId: cTop.id,
@@ -198,10 +173,10 @@
       }
 
       // ---- 3. 贝塞尔（紫色） ----
-      const bRight = store.getNodeAnchors(nodeB.id).find(a => a.position === 'right');
-      const dLeft = store.getNodeAnchors(nodeD.id).find(a => a.position === 'left');
+      const bRight = SE.getNodeAnchors(nodeB.id).find(a => a.position === 'right');
+      const dLeft = SE.getNodeAnchors(nodeD.id).find(a => a.position === 'left');
       if (bRight && dLeft) {
-        chart.addConnection({
+        SE.addConnection({
           connectorType: 'bezier',
           sourceAnchorId: bRight.id,
           targetAnchorId: dLeft.id,
@@ -209,24 +184,22 @@
           strokeWidth: 3,
           stub: 40,
           gap: 0,
-          arrow: { direction: 'both', type: 'fork' },
+          arrow: { direction: 'target', length: 18, type: 'fork' },
         });
       }
 
       log('✅ 就绪。三种连线类型均显示 stub（法线方向）。箭头：直线/流程图用三角形，贝塞尔用三叉。');
 
-      // ---- 重置按钮 ----
       document.getElementById('btn-reset').addEventListener('click', () => {
-        chart.updateNode(nodeA.id, { x: 60, y: 60 });
-        chart.updateNode(nodeB.id, { x: 360, y: 60 });
-        chart.updateNode(nodeC.id, { x: 200, y: 260 });
-        chart.updateNode(nodeD.id, { x: 480, y: 260 });
+        SE.updateNode(nodeA.id, { x: 60, y: 60 });
+        SE.updateNode(nodeB.id, { x: 360, y: 60 });
+        SE.updateNode(nodeC.id, { x: 200, y: 260 });
+        SE.updateNode(nodeD.id, { x: 480, y: 260 });
         log('节点位置已重置');
       });
 
-      // ---- 挂载调试辅助到全局 ----
       window.getArrowInfo = function (connId) {
-        const conn = connId ? store.getConnection(connId) : store.getAllConnections()[0];
+        const conn = connId ? SE.getConnection(connId) : SE.getAllConnections()[0];
         if (!conn) {
           console.warn('未找到连线');
           return;
@@ -236,7 +209,7 @@
           console.warn('该连线没有箭头');
           return;
         }
-        const pathInfo = store.computeConnectionPath(conn);
+        const pathInfo = SE.store.computeConnectionPath(conn);
         if (!pathInfo) {
           console.warn('无法计算路径');
           return;
@@ -249,7 +222,6 @@
         console.log('起点:', start);
         console.log('终点:', end);
 
-        // 根据方向选择对应的方向向量
         const dir = arrow.direction === 'target' ? endDirection : arrow.direction === 'source' ? startDirection : null;
         if (!dir) {
           console.warn('方向向量为空');
@@ -266,7 +238,6 @@
         console.log('箭头宽度:', width);
         const tipAngle = (2 * Math.atan2(width / 2, length) * 180) / Math.PI;
         console.log('箭头顶角（度）:', tipAngle.toFixed(2));
-
         console.groupEnd();
       };
 

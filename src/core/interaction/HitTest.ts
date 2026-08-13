@@ -11,7 +11,7 @@ export class HitTest {
     point: Point,
     store: Store,
     excludeAnchorId?: string,
-    hitRadius: number = 12
+    hitRadius: number = 15
   ): Anchor | null {
     const allAnchors = store.getAllAnchors();
     let closest: Anchor | null = null;

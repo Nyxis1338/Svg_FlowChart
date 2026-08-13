@@ -8,22 +8,22 @@ import type { Point } from '../../types/geometry';
 import type { Anchor, Node } from '../../types/SvgModel';
 
 export class EventBus {
-  private chart: SvgEngine;
+  private SE: SvgEngine;
   private store: Store;
   private selection: SelectionManager;
   private dragManager: DragManager;
   private isMenuVisible: boolean = false;
 
-  constructor(chart: SvgEngine) {
-    this.chart = chart;
-    this.store = chart.store;
-    this.selection = chart.selection;
-    this.dragManager = chart.dragManager;
+  constructor(SE: SvgEngine) {
+    this.SE = SE;
+    this.store = SE.store;
+    this.selection = SE.selection;
+    this.dragManager = SE.dragManager;
     this.bindEvents();
   }
 
   private bindEvents() {
-    const svg = this.chart.getSvgRoot();
+    const svg = this.SE.getSvgRoot();
     svg.addEventListener('mousedown', this.onMouseDown.bind(this));
     svg.addEventListener('click', this.onClick.bind(this));
     svg.addEventListener('contextmenu', this.onContextMenu.bind(this));
@@ -32,10 +32,23 @@ export class EventBus {
 
   private onMouseDown(e: MouseEvent) {
     if (e.button !== 0) return;
-    if (this.chart.viewport.isSpaceActive()) return;
+    if (this.SE.viewport.isSpaceActive()) return;
 
     const target = e.target as SVGElement;
-    // 1. 检测连线（点击选中）
+
+    // ---------- 1. 优先级最高：检测锚点（圆圈） ----------
+    if (target.tagName === 'circle' && target.hasAttribute('data-anchor-id')) {
+      const anchorId = target.getAttribute('data-anchor-id')!;
+      const anchor = this.store.getAnchor(anchorId);
+      if (anchor) {
+        this.dragManager.startLinkDrag(anchor, e);
+        e.stopPropagation();
+        e.preventDefault();
+        return;
+      }
+    }
+
+    // ---------- 2. 次优先级：检测连线 ----------
     let connId: string | undefined;
     let el: SVGElement | null = target;
     while (el && !connId) {
@@ -51,19 +64,7 @@ export class EventBus {
       return;
     }
 
-    // 2. 检测普通锚点（圆圈）
-    if (target.tagName === 'circle' && target.hasAttribute('data-anchor-id')) {
-      const anchorId = target.getAttribute('data-anchor-id')!;
-      const anchor = this.store.getAnchor(anchorId);
-      if (anchor) {
-        this.dragManager.startLinkDrag(anchor, e);
-        e.stopPropagation();
-        e.preventDefault();
-        return;
-      }
-    }
-
-    // 3. 检测节点
+    // ---------- 3. 最后：检测节点 ----------
     let nodeId: string | undefined;
     el = target;
     while (el && !nodeId) {
@@ -79,7 +80,7 @@ export class EventBus {
       return;
     }
 
-    // 4. 无连续锚点，直接启动节点拖拽
+    // 启动节点拖拽
     this.dragManager.startNodeDrag(e);
     e.stopPropagation();
     e.preventDefault();
@@ -92,7 +93,7 @@ export class EventBus {
   private onContextMenu(e: MouseEvent) {
     e.preventDefault();
     this.isMenuVisible = true;
-    this.chart.contextMenu.show(e);
+    this.SE.contextMenu.show(e);
   }
 
   private hideMenu(e: MouseEvent) {
@@ -100,11 +101,11 @@ export class EventBus {
     const target = e.target as HTMLElement;
     if (target.closest && target.closest('.context-menu')) return;
     this.isMenuVisible = false;
-    this.chart.contextMenu.hide();
+    this.SE.contextMenu.hide();
   }
 
   destroy() {
-    const svg = this.chart.getSvgRoot();
+    const svg = this.SE.getSvgRoot();
     svg.removeEventListener('mousedown', this.onMouseDown.bind(this));
     svg.removeEventListener('click', this.onClick.bind(this));
     svg.removeEventListener('contextmenu', this.onContextMenu.bind(this));

@@ -18,25 +18,25 @@ import { Geometry } from '../../calc/geometry';
  */
 export class ConnectionDrag {
   private readonly dragManager: DragManager;
-  private readonly chart: SvgEngine;
+  private readonly SE: SvgEngine;
   private hitTest = new HitTest();
 
   constructor(dragManager: DragManager) {
     this.dragManager = dragManager;
-    this.chart = dragManager['chart'];
+    this.SE = dragManager['SE'];
   }
 
   private get store(): Store {
-    return this.chart.store;
+    return this.SE.store;
   }
   private get viewport(): ViewportManager {
-    return this.chart.viewport;
+    return this.SE.viewport;
   }
   private get selection(): SelectionManager {
-    return this.chart.selection;
+    return this.SE.selection;
   }
   private get renderer(): SvgRenderer {
-    return this.chart.renderer;
+    return this.SE.renderer;
   }
 
   /**
@@ -95,7 +95,7 @@ export class ConnectionDrag {
     }
 
     this.dragManager.pendingDrag = null;
-    this.chart.getSvgRoot().style.cursor = 'grabbing';
+    this.SE.getSvgRoot().style.cursor = 'grabbing';
     this.clearHighlight();
   }
 

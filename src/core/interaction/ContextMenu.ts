@@ -52,12 +52,12 @@ function createSeparator(): HTMLDivElement {
 
 export class ContextMenu {
   private menuEl: HTMLDivElement;
-  private chart: SvgEngine;
+  private SE: SvgEngine;
   private store: Store;
   private selection: SelectionManager;
 
-  constructor(chart: SvgEngine, store: Store, selection: SelectionManager) {
-    this.chart = chart;
+  constructor(SE: SvgEngine, store: Store, selection: SelectionManager) {
+    this.SE = SE;
     this.store = store;
     this.selection = selection;
     this.menuEl = createContextMenu();

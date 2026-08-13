@@ -10,24 +10,24 @@ import type { DragManager } from './DragManager';
 
 export class NodeDrag {
   private readonly dragManager: DragManager;
-  private readonly chart: SvgEngine;
+  private readonly SE: SvgEngine;
 
   constructor(dragManager: DragManager) {
     this.dragManager = dragManager;
-    this.chart = dragManager['chart'];
+    this.SE = dragManager['SE'];
   }
 
   private get store(): Store {
-    return this.chart.store;
+    return this.SE.store;
   }
   private get viewport(): ViewportManager {
-    return this.chart.viewport;
+    return this.SE.viewport;
   }
   private get selection(): SelectionManager {
-    return this.chart.selection;
+    return this.SE.selection;
   }
   private get renderer(): SvgRenderer {
-    return this.chart.renderer;
+    return this.SE.renderer;
   }
 
   start(evt: MouseEvent): void {

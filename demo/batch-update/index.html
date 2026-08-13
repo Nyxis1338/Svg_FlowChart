@@ -108,7 +108,6 @@
       <div id="canvas-wrap"></div>
       <div class="controls">
         <h3>🔧 批量操作</h3>
-
         <div class="section-title">节点</div>
         <button id="node-red">节点 → 填充红色</button>
         <button id="node-blue-border">节点 → 边框蓝色</button>
@@ -144,9 +143,8 @@
       import { ConnectorColors } from '../../src/styles/defaults';
 
       const container = document.getElementById('canvas-wrap');
-      const chart = new SvgEngine(container);
-      window.chart = chart;
-      const store = chart.store;
+      const SE = new SvgEngine(container);
+      window.SE = SE;
       const logEl = document.getElementById('log');
 
       function log(msg, isSelected = false) {
@@ -158,69 +156,28 @@
         console.log(msg);
       }
 
-      // ---------- 创建示例节点 ----------
+      // ---- 辅助：添加四个方向锚点（全部 both） ----
       function addDefaultAnchors(nodeId) {
-        chart.addAnchor({
-          nodeId,
-          position: 'top',
-          direction: 'output',
-          radius: 5,
-        });
-        chart.addAnchor({
-          nodeId,
-          position: 'right',
-          direction: 'output',
-          radius: 5,
-        });
-        chart.addAnchor({
-          nodeId,
-          position: 'bottom',
-          direction: 'input',
-          radius: 5,
-        });
-        chart.addAnchor({
-          nodeId,
-          position: 'left',
-          direction: 'input',
-          radius: 5,
-        });
+        SE.addAnchor({ nodeId, position: 'top', radius: 5 });
+        SE.addAnchor({ nodeId, position: 'right', radius: 5 });
+        SE.addAnchor({ nodeId, position: 'bottom', radius: 5 });
+        SE.addAnchor({ nodeId, position: 'left', radius: 5 });
       }
 
-      const nodeA = chart.addNode({
-        x: 80,
-        y: 80,
-        width: 140,
-        height: 90,
-        label: '节点 A',
-        shape: 'rectangle',
-      });
+      const nodeA = SE.addNode({ x: 80, y: 80, width: 140, height: 90, label: '节点 A', shape: 'rectangle' });
       addDefaultAnchors(nodeA.id);
 
-      const nodeB = chart.addNode({
-        x: 380,
-        y: 80,
-        width: 140,
-        height: 90,
-        label: '节点 B',
-        shape: 'rectangle',
-      });
+      const nodeB = SE.addNode({ x: 380, y: 80, width: 140, height: 90, label: '节点 B', shape: 'rectangle' });
       addDefaultAnchors(nodeB.id);
 
-      const nodeC = chart.addNode({
-        x: 230,
-        y: 280,
-        width: 140,
-        height: 90,
-        label: '节点 C',
-        shape: 'diamond',
-      });
+      const nodeC = SE.addNode({ x: 230, y: 280, width: 140, height: 90, label: '节点 C', shape: 'diamond' });
       addDefaultAnchors(nodeC.id);
 
-      // ---------- 创建连线（带箭头和标签） ----------
-      const aRight = store.getNodeAnchors(nodeA.id).find(a => a.position === 'right');
-      const bLeft = store.getNodeAnchors(nodeB.id).find(a => a.position === 'left');
+      // ---------- 创建连线 ----------
+      const aRight = SE.getNodeAnchors(nodeA.id).find(a => a.position === 'right');
+      const bLeft = SE.getNodeAnchors(nodeB.id).find(a => a.position === 'left');
       if (aRight && bLeft) {
-        chart.addConnection({
+        SE.addConnection({
           connectorType: 'bezier',
           sourceAnchorId: aRight.id,
           targetAnchorId: bLeft.id,
@@ -231,10 +188,10 @@
         });
       }
 
-      const aBottom = store.getNodeAnchors(nodeA.id).find(a => a.position === 'bottom');
-      const cTop = store.getNodeAnchors(nodeC.id).find(a => a.position === 'top');
+      const aBottom = SE.getNodeAnchors(nodeA.id).find(a => a.position === 'bottom');
+      const cTop = SE.getNodeAnchors(nodeC.id).find(a => a.position === 'top');
       if (aBottom && cTop) {
-        chart.addConnection({
+        SE.addConnection({
           connectorType: 'flowchart',
           sourceAnchorId: aBottom.id,
           targetAnchorId: cTop.id,
@@ -242,14 +199,13 @@
           strokeWidth: 2,
           label: { text: '连线 2', fontSize: 14, color: '#333', offset: { x: 20, y: 0 } },
           arrow: { direction: 'both', length: 12, width: 8 },
-          // stub: 10,
         });
       }
 
-      const bRight = store.getNodeAnchors(nodeB.id).find(a => a.position === 'right');
-      const cBottom = store.getNodeAnchors(nodeC.id).find(a => a.position === 'bottom');
+      const bRight = SE.getNodeAnchors(nodeB.id).find(a => a.position === 'right');
+      const cBottom = SE.getNodeAnchors(nodeC.id).find(a => a.position === 'bottom');
       if (bRight && cBottom) {
-        chart.addConnection({
+        SE.addConnection({
           connectorType: 'straight',
           sourceAnchorId: bRight.id,
           targetAnchorId: cBottom.id,
@@ -262,87 +218,80 @@
 
       log('✅ 就绪。点击连线可选中，再点击“随机当前选中连线”按钮可单独修改该连线。');
 
-      // ---------- 监听选中变化（显示当前选中连线） ----------
-      chart.selection.subscribe(() => {
-        const sel = chart.selection.getSelection();
+      // ---------- 监听选中变化 ----------
+      SE.selection.subscribe(() => {
+        const sel = SE.selection.getSelection();
         if (sel.type === 'connection' && sel.id) {
-          const conn = store.getConnection(sel.id);
+          const conn = SE.getConnection(sel.id);
           if (conn) {
             log(`📍 当前选中连线: ${conn.id} (颜色: ${conn.stroke})`, true);
           }
-        } else {
-          // 不清除普通日志，避免干扰
         }
       });
 
       // ---------- 按钮绑定 ----------
       document.getElementById('node-red').addEventListener('click', () => {
-        chart.updateAllNodes({ fill: '#ffcccc' });
+        SE.updateAllNodes({ fill: '#ffcccc' });
         log('所有节点填充改为红色');
       });
       document.getElementById('node-blue-border').addEventListener('click', () => {
-        chart.updateAllNodes({ stroke: '#1976d2', strokeWidth: 3 });
+        SE.updateAllNodes({ stroke: '#1976d2', strokeWidth: 3 });
         log('所有节点边框改为蓝色，宽度 3');
       });
       document.getElementById('node-shadow-off').addEventListener('click', () => {
-        chart.updateAllNodes({ shadow: false });
+        SE.updateAllNodes({ shadow: false });
         log('所有节点关闭阴影');
       });
 
       document.getElementById('conn-green').addEventListener('click', () => {
-        chart.updateAllConnections({ stroke: '#4caf50' });
+        SE.updateAllConnections({ stroke: '#4caf50' });
         log('所有连线改为绿色');
       });
       document.getElementById('conn-width-4').addEventListener('click', () => {
-        chart.updateAllConnections({ strokeWidth: 4 });
+        SE.updateAllConnections({ strokeWidth: 4 });
         log('所有连线宽度改为 4');
       });
 
       document.getElementById('arrow-large').addEventListener('click', () => {
-        chart.updateAllConnections({ arrow: { direction: 'target', length: 20, width: 12 } });
+        SE.updateAllConnections({ arrow: { direction: 'target', length: 20, width: 12 } });
         log('所有箭头改为 长20 宽12（方向：目标）');
       });
       document.getElementById('arrow-red').addEventListener('click', () => {
-        chart.updateAllConnections({
-          arrow: { direction: 'target', length: 12, width: 8, color: '#ff0000' },
-        });
+        SE.updateAllConnections({ arrow: { direction: 'target', length: 12, width: 8, color: '#ff0000' } });
         log('所有箭头改为红色（方向：目标，尺寸默认）');
       });
       document.getElementById('arrow-none').addEventListener('click', () => {
-        chart.updateAllConnections({ arrow: { direction: 'none' } });
+        SE.updateAllConnections({ arrow: { direction: 'none' } });
         log('所有箭头移除');
       });
 
       document.getElementById('label-bold').addEventListener('click', () => {
-        chart.updateAllConnections({ label: { text: '【加粗】', fontSize: 14, color: '#333' } });
+        SE.updateAllConnections({ label: { text: '【加粗】', fontSize: 14, color: '#333' } });
         log('所有标签文本前缀加粗标识');
       });
       document.getElementById('label-large').addEventListener('click', () => {
-        chart.updateAllConnections({ label: { text: '大号', fontSize: 20, color: '#333' } });
+        SE.updateAllConnections({ label: { text: '大号', fontSize: 20, color: '#333' } });
         log('所有标签字体改为 20px');
       });
       document.getElementById('label-blue').addEventListener('click', () => {
-        chart.updateAllConnections({ label: { text: '蓝色标签', fontSize: 14, color: '#1976d2' } });
+        SE.updateAllConnections({ label: { text: '蓝色标签', fontSize: 14, color: '#1976d2' } });
         log('所有标签改为蓝色');
       });
 
-      // ========== 新增：随机当前选中连线样式（包括连线类型） ==========
       document.getElementById('random-connection').addEventListener('click', () => {
-        const sel = chart.selection.getSelection();
+        const sel = SE.selection.getSelection();
         if (sel.type !== 'connection' || !sel.id) {
           log('⚠️ 请先点击一条连线以选中它', false);
           return;
         }
-
-        const conn = store.getConnection(sel.id);
+        const conn = SE.getConnection(sel.id);
         if (!conn) {
           log('⚠️ 选中的连线不存在', false);
           return;
         }
 
-        // 随机颜色
-        const randomColor = () => {
-          const colors = [
+        const randomColor = () =>
+          [
             '#e74c3c',
             '#2ecc71',
             '#f39c12',
@@ -353,33 +302,17 @@
             '#e84393',
             '#00b894',
             '#fd79a8',
-          ];
-          return colors[Math.floor(Math.random() * colors.length)];
-        };
-
-        // 随机宽度 1~5
+          ][Math.floor(Math.random() * 10)];
         const randomWidth = () => Math.floor(Math.random() * 5) + 1;
-
-        // 随机箭头方向
-        const randomArrowDir = () => {
-          const dirs = ['none', 'source', 'target', 'both'];
-          return dirs[Math.floor(Math.random() * dirs.length)];
-        };
-
-        // 随机标签文本
-        const randomLabelText = () => {
-          const texts = ['Hello', 'World', 'Flow', 'Edge', 'Connect', 'Link', 'Node', 'Edge', 'Path', 'Line'];
-          return texts[Math.floor(Math.random() * texts.length)];
-        };
-
-        // 随机连线类型（直线 | 贝塞尔 | Flowchart）
-        const randomConnectorType = () => {
-          const types = ['straight', 'bezier', 'flowchart'];
-          return types[Math.floor(Math.random() * types.length)];
-        };
+        const randomArrowDir = () => ['none', 'source', 'target', 'both'][Math.floor(Math.random() * 4)];
+        const randomLabelText = () =>
+          ['Hello', 'World', 'Flow', 'Edge', 'Connect', 'Link', 'Node', 'Edge', 'Path', 'Line'][
+            Math.floor(Math.random() * 10)
+          ];
+        const randomConnectorType = () => ['straight', 'bezier', 'flowchart'][Math.floor(Math.random() * 3)];
 
         const patch = {
-          connectorType: randomConnectorType(), // 新增：随机切换连线类型
+          connectorType: randomConnectorType(),
           stroke: randomColor(),
           strokeWidth: randomWidth(),
           arrow: {
@@ -396,11 +329,12 @@
           },
         };
 
-        chart.updateConnection(sel.id, patch);
+        SE.updateConnection(sel.id, patch);
         const typeName =
           patch.connectorType === 'straight' ? '直线' : patch.connectorType === 'bezier' ? '贝塞尔' : 'Flowchart';
         log(`🎲 连线 ${sel.id} 已随机更新样式 (类型: ${typeName})`, true);
       });
+
       document.getElementById('reset-all').addEventListener('click', () => {
         location.reload();
       });

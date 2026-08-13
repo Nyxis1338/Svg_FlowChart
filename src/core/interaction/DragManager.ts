@@ -43,7 +43,7 @@ export class DragManager {
     isReconnect: boolean;
   } | null = null;
 
-  private readonly chart: SvgEngine;
+  private readonly SE: SvgEngine;
   private rafId: number | null = null;
   private lastMoveEvent: MouseEvent | null = null;
   private dragEventsBound = false;
@@ -55,8 +55,8 @@ export class DragManager {
     return this.state !== 'idle';
   }
 
-  constructor(chart: SvgEngine) {
-    this.chart = chart;
+  constructor(SE: SvgEngine) {
+    this.SE = SE;
   }
 
   // ==================== 公共入口 ====================
@@ -134,12 +134,12 @@ export class DragManager {
       const { anchor } = this.pendingDrag;
       console.log('🔍 [点击锚点] (未拖拽) 锚点:', anchor.id);
       this.pendingDrag = null;
-      this.chart.getSvgRoot().style.cursor = '';
+      this.SE.getSvgRoot().style.cursor = '';
       this.unbindDragEvents();
       return;
     }
 
-    this.chart.getSvgRoot().style.cursor = '';
+    this.SE.getSvgRoot().style.cursor = '';
     if (this.rafId !== null) {
       cancelAnimationFrame(this.rafId);
       this.rafId = null;
@@ -204,7 +204,7 @@ export class DragManager {
     }
     this.currentExecutor?.cancel?.();
     this.renderer.clearTempLine();
-    this.chart.getSvgRoot().style.cursor = '';
+    this.SE.getSvgRoot().style.cursor = '';
     this.nodeDragData = null;
     this.linkDragData = null;
     this.pendingDrag = null;
@@ -216,16 +216,16 @@ export class DragManager {
   // ==================== Getter ====================
 
   private get store(): Store {
-    return this.chart.store;
+    return this.SE.store;
   }
   private get viewport(): ViewportManager {
-    return this.chart.viewport;
+    return this.SE.viewport;
   }
   private get selection(): SelectionManager {
-    return this.chart.selection;
+    return this.SE.selection;
   }
   private get renderer(): SvgRenderer {
-    return this.chart.renderer;
+    return this.SE.renderer;
   }
 
   destroy(): void {

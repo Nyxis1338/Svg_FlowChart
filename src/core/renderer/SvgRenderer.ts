@@ -9,7 +9,7 @@ import type { SelectionManager } from '../selection/SelectionManager';
 import { TempLineManager } from './TempLineManager';
 
 export class SvgRenderer {
-  private readonly chart: SvgEngine;
+  private readonly SE: SvgEngine;
   private readonly svgRoot: SVGSVGElement;
   private readonly viewport: ViewportManager;
   private readonly selection: SelectionManager;
@@ -21,19 +21,19 @@ export class SvgRenderer {
 
   private reconnectingIds = new Set<string>();
 
-  constructor(chart: SvgEngine) {
-    this.chart = chart;
-    this.svgRoot = chart.getSvgRoot();
-    this.viewport = chart.viewport;
-    this.selection = chart.selection;
+  constructor(SE: SvgEngine) {
+    this.SE = SE;
+    this.svgRoot = SE.getSvgRoot();
+    this.viewport = SE.viewport;
+    this.selection = SE.selection;
 
     this.layerManager = new LayerManager(this.viewport.getContentGroup());
 
-    this.nodeRenderer = new NodeRenderer(this.chart.store, this.selection, this.layerManager.elementLayer);
-    this.connectionRenderer = new ConnectionRenderer(this.chart.store, this.selection, this.layerManager.elementLayer);
+    this.nodeRenderer = new NodeRenderer(this.SE.store, this.selection, this.layerManager.elementLayer);
+    this.connectionRenderer = new ConnectionRenderer(this.SE.store, this.selection, this.layerManager.elementLayer);
     this.tempLineManager = new TempLineManager(this.layerManager.tempLayer);
 
-    this.chart.store.subscribe(() => this.renderAll());
+    this.SE.store.subscribe(() => this.renderAll());
     this.selection.subscribe(() => this.renderAll());
   }
 
