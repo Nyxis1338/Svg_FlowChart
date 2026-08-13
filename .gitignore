@@ -4,7 +4,7 @@ node_modules/
 .pnp.js
 
 # 构建产物
-dist/
+dist/*.map
 build/
 out/
 tsc-out/
