@@ -9,7 +9,6 @@ import type { SelectionManager } from '../selection/SelectionManager';
 import type { Anchor } from '../../types/SvgModel';
 import { NodeDrag } from './NodeDrag';
 import { ConnectionDrag } from './ConnectionDrag';
-import { ReConnectionDrag } from './ReConnectionDrag';
 
 // 使用字符串字面量类型替代枚举
 export type DragState = 'idle' | 'node_dragging' | 'link_dragging' | 'hovering';
@@ -50,7 +49,7 @@ export class DragManager {
   private dragEventsBound = false;
 
   // 当前活跃的执行器
-  private currentExecutor: NodeDrag | ConnectionDrag | ReConnectionDrag | null = null;
+  private currentExecutor: NodeDrag | ConnectionDrag | null = null;
 
   public get isDragging(): boolean {
     return this.state !== 'idle';
@@ -75,11 +74,7 @@ export class DragManager {
     const existingConnection = this.store.findConnectionByAnchor(anchor.id);
     const isReconnect = existingConnection !== undefined && !this.store.isAnchorFull(anchor.id);
 
-    if (isReconnect) {
-      this.currentExecutor = new ReConnectionDrag(this);
-    } else {
-      this.currentExecutor = new ConnectionDrag(this);
-    }
+    this.currentExecutor = new ConnectionDrag(this);
     this.currentExecutor.start(anchor, evt);
     this.bindDragEvents();
     evt.preventDefault();
@@ -118,7 +113,7 @@ export class DragManager {
       const dy = canvasPos.y - this.pendingDrag.startPos.y;
       if (Math.sqrt(dx * dx + dy * dy) > 5) {
         if (this.currentExecutor && 'startDragging' in this.currentExecutor) {
-          (this.currentExecutor as ConnectionDrag | ReConnectionDrag).startDragging();
+          (this.currentExecutor as ConnectionDrag).startDragging();
         }
         this.lastMoveEvent = evt;
         if (this.rafId === null) {

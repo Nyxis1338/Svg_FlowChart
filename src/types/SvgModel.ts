@@ -59,7 +59,6 @@ export interface Anchor {
   id: string;
   nodeId: string;
   position?: AnchorPosition;
-  direction: 'input' | 'output' | 'both';
   radius?: number;
   fill?: string;
   stroke?: string;

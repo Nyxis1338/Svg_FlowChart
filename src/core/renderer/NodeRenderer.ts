@@ -78,11 +78,9 @@ export class NodeRenderer {
         circle.dataset['zIndex'] = String(nodeZ + 1);
         circle.dataset['nodeId'] = node.id;
 
-        const dirStyle = Defaults.anchor.directionStyles[ap.direction] || Defaults.anchor.directionStyles.both;
-        circle.setAttribute('fill', ap.fill ?? dirStyle.fill);
-        circle.setAttribute('stroke', ap.stroke ?? dirStyle.stroke);
-        circle.setAttribute('stroke-width', String(ap.strokeWidth ?? dirStyle.strokeWidth));
-
+        circle.setAttribute('fill', ap.fill ?? Defaults.anchor.fill);
+        circle.setAttribute('stroke', ap.stroke ?? Defaults.anchor.stroke);
+        circle.setAttribute('stroke-width', String(ap.strokeWidth ?? Defaults.anchor.strokeWidth));
         this.elementLayer.appendChild(circle);
       }
     }
@@ -104,11 +102,10 @@ export class NodeRenderer {
         circle.setAttribute('stroke-width', String(Defaults.anchor.hoverStrokeWidth));
         circle.setAttribute('filter', Defaults.anchor.hoverShadow);
       } else {
-        const dirStyle = Defaults.anchor.directionStyles[ap?.direction ?? 'both'];
         circle.setAttribute('r', String(baseRadius));
-        circle.setAttribute('stroke', ap?.stroke ?? dirStyle.stroke);
-        circle.setAttribute('fill', ap?.fill ?? dirStyle.fill);
-        circle.setAttribute('stroke-width', String(ap?.strokeWidth ?? dirStyle.strokeWidth));
+        circle.setAttribute('stroke', ap?.stroke ?? Defaults.anchor.stroke);
+        circle.setAttribute('fill', ap?.fill ?? Defaults.anchor.fill);
+        circle.setAttribute('stroke-width', String(ap?.strokeWidth ?? Defaults.anchor.strokeWidth));
         circle.setAttribute('filter', 'none');
       }
     }
