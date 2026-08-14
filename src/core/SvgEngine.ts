@@ -5,7 +5,7 @@ import { ViewportManager } from './viewport/ViewportManager';
 import { SelectionManager } from './selection/SelectionManager';
 import { DragManager } from './interaction/DragManager';
 import { SvgRenderer } from './renderer/SvgRenderer';
-import type { Node, Connection, Anchor } from '../types/SvgModel';
+import type { Node, Connection, Anchor, AnchorPosition } from '../types/SvgModel';
 import type { Point } from '../types/geometry';
 import { EventBus } from './interaction/EventBus';
 import { ContextMenu } from './interaction/ContextMenu';
@@ -112,7 +112,15 @@ export class SvgEngine {
   }
 
   // ==================== 锚点操作 ====================
-  addAnchor(data: Omit<Anchor, 'id'>): Anchor {
+  // 重载签名
+  addAnchor(data: { nodeId: string; position: AnchorPosition } & Partial<Anchor>): Anchor;
+  addAnchor(data: { nodeId: string; position: AnchorPosition[] } & Partial<Anchor>): Anchor[];
+  // 实现
+  addAnchor(data: any): Anchor | Anchor[] {
+    if (Array.isArray(data.position)) {
+      const { nodeId, position: positions, ...options } = data;
+      return positions.map((pos: AnchorPosition) => this.addAnchor({ nodeId, position: pos, ...options }));
+    }
     const id = `anchor-${crypto.randomUUID()}`;
     const anchor: Anchor = { id, ...data };
     return this.store.addAnchor(anchor);

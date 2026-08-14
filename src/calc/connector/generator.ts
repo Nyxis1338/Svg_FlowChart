@@ -92,14 +92,7 @@ export function generateConnectionPath(
   const connectorBody = connectorPath.replace(/^M/, 'L');
 
   // 7. 完整路径
-  const pathD =
-    `M ${rawStart.x} ${rawStart.y}` +
-    ` L ${stubStart.x} ${stubStart.y}` +
-    ` L ${start.x} ${start.y}` +
-    ` ${connectorBody}` +
-    ` L ${end.x} ${end.y}` +
-    ` L ${stubEnd.x} ${stubEnd.y}` +
-    ` L ${rawEnd.x} ${rawEnd.y}`;
+  const pathD = ` M ${stubStart.x} ${stubStart.y}` + ` ${connectorBody}` + ` L ${stubEnd.x} ${stubEnd.y}`;
 
   return {
     pathD,

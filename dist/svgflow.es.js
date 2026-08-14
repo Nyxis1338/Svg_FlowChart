@@ -356,7 +356,7 @@ function m(n, r, i) {
 	w = C === "flowchart" ? p(b, x) : C === "bezier" ? f(b, x) : d(b, x);
 	let T = w.path, E = w.startDirection, D = w.endDirection, O = T.replace(/^M/, "L");
 	return {
-		pathD: `M ${h.x} ${h.y} L ${y.x} ${y.y} L ${b.x} ${b.y} ${O} L ${x.x} ${x.y} L ${S.x} ${S.y} L ${g.x} ${g.y}`,
+		pathD: `M ${y.x} ${y.y} ${O} L ${S.x} ${S.y}`,
 		startDirection: E,
 		endDirection: D,
 		rawStart: h,
@@ -399,10 +399,7 @@ var h = class {
 		return [...this.nodes.values()].map((e) => structuredClone(e));
 	}
 	addAnchor(e) {
-		let t = {
-			...e,
-			zIndex: e.zIndex ?? this.getNextZIndex()
-		};
+		let t = { ...e };
 		return this.anchors.set(t.id, structuredClone(t)), this.notify("anchor"), t;
 	}
 	getAnchor(e) {
@@ -511,7 +508,6 @@ var h = class {
 	getMaxZIndex() {
 		let t = e.zIndexBase - 1;
 		for (let e of this.nodes.values()) e.zIndex !== void 0 && e.zIndex > t && (t = e.zIndex);
-		for (let e of this.anchors.values()) e.zIndex !== void 0 && e.zIndex > t && (t = e.zIndex);
 		for (let e of this.connections.values()) e.zIndex !== void 0 && e.zIndex > t && (t = e.zIndex);
 		return t;
 	}
@@ -1428,6 +1424,14 @@ var M = class {
 		this.store.removeConnection(e);
 	}
 	addAnchor(e) {
+		if (Array.isArray(e.position)) {
+			let { nodeId: t, position: n, ...r } = e;
+			return n.map((e) => this.addAnchor({
+				nodeId: t,
+				position: e,
+				...r
+			}));
+		}
 		let t = {
 			id: `anchor-${crypto.randomUUID()}`,
 			...e
@@ -1497,6 +1501,6 @@ var M = class {
 	}
 };
 //#endregion
-export { e as Defaults, s as Geometry, N as SvgEngine };
+export { e as Defaults, N as SvgEngine };
 
 //# sourceMappingURL=svgflow.es.js.map

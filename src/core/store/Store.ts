@@ -67,7 +67,9 @@ export class Store {
 
   // ---- Anchor 操作 ----
   addAnchor(anchor: Anchor): Anchor {
-    const newAnchor = { ...anchor, zIndex: anchor.zIndex ?? this.getNextZIndex() };
+    // const newAnchor = { ...anchor, zIndex: anchor.zIndex ?? this.getNextZIndex() };
+    // 不再分配 zIndex，让渲染器动态计算
+    const newAnchor = { ...anchor }; // 删除 zIndex 相关
     this.anchors.set(newAnchor.id, structuredClone(newAnchor));
     this.notify('anchor');
     return newAnchor;
@@ -292,9 +294,10 @@ export class Store {
     for (const node of this.nodes.values()) {
       if (node.zIndex !== undefined && node.zIndex > max) max = node.zIndex;
     }
-    for (const anchor of this.anchors.values()) {
-      if (anchor.zIndex !== undefined && anchor.zIndex > max) max = anchor.zIndex;
-    }
+    // 跳过锚点
+    // for (const anchor of this.anchors.values()) {
+    //   if (anchor.zIndex !== undefined && anchor.zIndex > max) max = anchor.zIndex;
+    // }
     for (const conn of this.connections.values()) {
       if (conn.zIndex !== undefined && conn.zIndex > max) max = conn.zIndex;
     }

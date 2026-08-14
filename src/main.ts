@@ -94,7 +94,7 @@ addDefaultAnchors(SE, nodeD.id);
 const aRightOut = getAnchor(SE, nodeA.id, 'right');
 const bLeftIn = getAnchor(SE, nodeB.id, 'left');
 (window as any).conn1 = safeAddConnection(SE, aRightOut, bLeftIn, {
-  connectorType: 'flowSE',
+  connectorType: 'flowchart',
   stroke: randomColor(),
   strokeWidth: 2,
   label: { text: '折线', fontSize: 12, color: '#333', offset: { x: 0, y: -12 } },

@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>避障演示 - Flowchart 绕行</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        padding: 20px;
+        font-family: 'Segoe UI', sans-serif;
+        background: #f5f7fa;
+      }
+      h2 {
+        margin-bottom: 12px;
+        font-weight: 400;
+      }
+      .toolbar {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-bottom: 16px;
+      }
+      .toolbar button {
+        padding: 6px 16px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        background: #fff;
+        cursor: pointer;
+        font-size: 13px;
+        transition: 0.2s;
+      }
+      .toolbar button:hover {
+        background: #e3f2fd;
+        border-color: #1976d2;
+      }
+      #container {
+        width: 100%;
+        height: 600px;
+        background: #fff;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      }
+      #log {
+        margin-top: 12px;
+        padding: 8px 14px;
+        background: #1e1e1e;
+        color: #d4d4d4;
+        border-radius: 4px;
+        font-family: monospace;
+        font-size: 13px;
+        max-height: 120px;
+        overflow-y: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <h2>🧪 Flowchart 避障演示（绕行节点）</h2>
+    <div class="toolbar">
+      <button id="btn-reset">重置节点位置</button>
+      <span style="margin-left: auto; font-size: 13px; color: #555">拖动中间节点观察连线绕行</span>
+    </div>
+    <div id="container"></div>
+    <div id="log">初始化... 拖动阻挡节点，观察连线自动绕行</div>
+
+    <script type="importmap">
+      { "imports": { "svg-flowchart": "/src/" } }
+    </script>
+    <script type="module">
+      import { SvgEngine } from '/src/core/SvgEngine';
+      import { Defaults } from '/src/styles/defaults';
+
+      const container = document.getElementById('container');
+      const SE = new SvgEngine(container);
+      window.SE = SE;
+      const logEl = document.getElementById('log');
+
+      function log(msg) {
+        logEl.textContent = msg;
+        console.log(msg);
+      }
+
+      // ---- 辅助：添加四个方向锚点（全部 both） ----
+      function addDefaultAnchors(nodeId) {
+        SE.addAnchor({
+          nodeId,
+          position: ['top', 'right', 'bottom', 'left'],
+          radius: 5,
+        });
+      }
+
+      // ---- 创建三个节点 ----
+      // 源节点（左）
+      const nodeA = SE.addNode({
+        x: 80,
+        y: 200,
+        width: 120,
+        height: 80,
+        label: '起点',
+        shape: 'rectangle',
+        stroke: '#2980b9',
+        strokeWidth: 2,
+      });
+      addDefaultAnchors(nodeA.id);
+
+      // 阻挡节点（中间）
+      const nodeB = SE.addNode({
+        x: 280,
+        y: 200,
+        width: 120,
+        height: 80,
+        label: '阻挡',
+        shape: 'diamond',
+        fill: '#fff3e0',
+        stroke: '#f57c00',
+        strokeWidth: 2,
+      });
+      addDefaultAnchors(nodeB.id);
+
+      // 目标节点（右）
+      const nodeC = SE.addNode({
+        x: 480,
+        y: 200,
+        width: 120,
+        height: 80,
+        label: '终点',
+        shape: 'rectangle',
+        stroke: '#2980b9',
+        strokeWidth: 2,
+      });
+      addDefaultAnchors(nodeC.id);
+
+      // ---- 创建连线（flowchart，高亮显示） ----
+      const aRight = SE.getNodeAnchors(nodeA.id).find(a => a.position === 'right');
+      const cLeft = SE.getNodeAnchors(nodeC.id).find(a => a.position === 'left');
+      if (aRight && cLeft) {
+        SE.addConnection({
+          connectorType: 'flowchart',
+          sourceAnchorId: aRight.id,
+          targetAnchorId: cLeft.id,
+          stroke: '#e74c3c',
+          strokeWidth: 3,
+          stub: 20,
+          gap: 5,
+          arrow: { direction: 'target', length: 16, type: 'triangle' },
+        });
+        log('✅ 连线已创建。拖动中间“阻挡”节点，观察连线是否自动绕行。');
+      }
+
+      // ---- 重置按钮 ----
+      document.getElementById('btn-reset').addEventListener('click', () => {
+        SE.updateNode(nodeA.id, { x: 80, y: 200 });
+        SE.updateNode(nodeB.id, { x: 280, y: 200 });
+        SE.updateNode(nodeC.id, { x: 480, y: 200 });
+        log('节点位置已重置');
+      });
+
+      // ---- 监听变化（调试） ----
+      SE.store.subscribe(() => {
+        const conn = SE.getAllConnections()[0];
+        if (conn) {
+          const pathInfo = SE.store.computeConnectionPath(conn);
+          if (pathInfo) {
+            console.log('路径已更新:', pathInfo.pathD);
+          }
+        }
+      });
+    </script>
+  </body>
+</html>

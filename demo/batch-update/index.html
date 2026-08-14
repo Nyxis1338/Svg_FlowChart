@@ -135,22 +135,19 @@
     </div>
     <div id="log">就绪</div>
 
-    <script src="../../dist/svgflow.umd.js"></script>
-    <script>
-      // 从 UMD 全局获取 SvgEngine
-      const { SvgEngine } = window.SvgFlow;
+    <script type="importmap">
+      {
+        "imports": {
+          "svg-flowchart": "/src/"
+        }
+      }
+    </script>
+    <script type="module">
+      import { SvgEngine } from '/src/core/SvgEngine';
+      import { Defaults } from '/src/styles/defaults';
 
-      // 本地定义颜色数组（与 defaults.ts 保持一致）
-      const ConnectorColors = [
-        '#5b6c7d', // 蓝灰
-        '#e74c3c', // 红
-        '#2ecc71', // 绿
-        '#f39c12', // 橙
-        '#9b59b6', // 紫
-        '#1abc9c', // 青
-        '#e67e22', // 橙红
-        '#3498db', // 蓝
-      ];
+      // 本地定义颜色数组
+      const ConnectorColors = ['#5b6c7d', '#e74c3c', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c', '#e67e22', '#3498db'];
 
       const container = document.getElementById('canvas-wrap');
       const SE = new SvgEngine(container);
@@ -166,12 +163,12 @@
         console.log(msg);
       }
 
-      // ---- 辅助：添加四个方向锚点（全部 both） ----
       function addDefaultAnchors(nodeId) {
-        SE.addAnchor({ nodeId, position: 'top', radius: 5 });
-        SE.addAnchor({ nodeId, position: 'right', radius: 5 });
-        SE.addAnchor({ nodeId, position: 'bottom', radius: 5 });
-        SE.addAnchor({ nodeId, position: 'left', radius: 5 });
+        SE.addAnchor({
+          nodeId,
+          position: ['top', 'right', 'bottom', 'left'],
+          radius: 5,
+        });
       }
 
       const nodeA = SE.addNode({ x: 80, y: 80, width: 140, height: 90, label: '节点 A', shape: 'rectangle' });

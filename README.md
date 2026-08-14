@@ -115,6 +115,16 @@ engine.getNodeAnchors(nodeId);
 engine.removeAnchor(id);
 ```
 
+新增写法（批量添加 注意是加了's'）：
+
+```typescript
+engine.addAnchors({
+  nodeId: nodeA.id,
+  ['top', 'right', 'bottom', 'left'],
+  {radius: 5}
+});
+```
+
 ### 连线操作
 
 ```typescript
