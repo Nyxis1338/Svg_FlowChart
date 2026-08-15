@@ -1,0 +1,133 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>标签编辑示例</title>
+    <style>
+      .toolbar {
+        padding: 10px;
+        background: #f0f0f0;
+        border-bottom: 1px solid #ccc;
+      }
+      .toolbar input {
+        padding: 6px 12px;
+        margin-right: 8px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+      }
+      .toolbar button {
+        padding: 6px 16px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        background: #fff;
+        cursor: pointer;
+      }
+      .toolbar button:hover {
+        background: #e3f2fd;
+      }
+      #container {
+        width: 100%;
+        height: 600px;
+      }
+      #status {
+        padding: 8px 14px;
+        font-size: 13px;
+        color: #555;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="toolbar">
+      <input type="text" id="labelInput" placeholder="输入新标签" />
+      <button id="updateLabelBtn">更新标签</button>
+      <button id="updateArrowBtn">箭头 → Both</button>
+      <span id="status">未选中任何元素</span>
+    </div>
+    <div id="container"></div>
+
+    <script type="importmap">
+      { "imports": { "svg-flowchart": "/src/" } }
+    </script>
+    <script type="module">
+      import { SvgEngine } from '/src/core/SvgEngine';
+      import { Defaults } from '/src/styles/defaults';
+
+      const container = document.getElementById('container');
+      const SE = new SvgEngine(container);
+      window.SE = SE;
+
+      // ---- 创建示例节点 ----
+      const nodeA = SE.addNode({ x: 100, y: 150, width: 140, height: 90, label: '节点A', shape: 'rectangle' });
+      const nodeB = SE.addNode({ x: 400, y: 150, width: 140, height: 90, label: '节点B', shape: 'rectangle' });
+
+      // 锚点
+      const anchorsA = SE.addAnchor({ nodeId: nodeA.id, position: ['right'], radius: 5 });
+      const anchorsB = SE.addAnchor({ nodeId: nodeB.id, position: ['left'], radius: 5 });
+
+      // 连线
+      const conn = SE.addConnection({
+        sourceAnchorId: anchorsA[0].id,
+        targetAnchorId: anchorsB[0].id,
+        connectorType: 'straight',
+        stroke: '#27ae60',
+        label: { text: '连线标签', fontSize: 14 },
+        arrow: { direction: 'target', length: 12 },
+      });
+
+      // ---- UI 元素 ----
+      const labelInput = document.getElementById('labelInput');
+      const statusEl = document.getElementById('status');
+      const updateLabelBtn = document.getElementById('updateLabelBtn');
+      const updateArrowBtn = document.getElementById('updateArrowBtn');
+
+      // ---- 监听选中变化，更新文本框和状态 ----
+      SE.selection.subscribe(() => {
+        const sel = SE.selection.getSelection();
+        if (sel.type === 'node' && sel.id) {
+          const node = SE.getNode(sel.id);
+          statusEl.textContent = `✅ 选中节点: ${node?.label || sel.id}`;
+          labelInput.value = node?.label || '';
+          labelInput.placeholder = '输入新标签';
+        } else if (sel.type === 'connection' && sel.id) {
+          const conn = SE.getConnection(sel.id);
+          statusEl.textContent = `✅ 选中连线: ${sel.id}`;
+          labelInput.value = conn?.label?.text || '';
+          labelInput.placeholder = '输入连线标签';
+        } else {
+          statusEl.textContent = '未选中任何元素';
+          labelInput.value = '';
+        }
+      });
+
+      // ---- 更新标签 ----
+      updateLabelBtn.addEventListener('click', () => {
+        const sel = SE.selection.getSelection();
+        if (!sel.id) {
+          alert('请先点击选中一个节点或连线');
+          return;
+        }
+        const newText = labelInput.value.trim();
+        if (!newText) {
+          alert('请输入标签文本');
+          return;
+        }
+        SE.setLabel(sel.id, newText);
+        statusEl.textContent = `✅ 已更新标签: "${newText}"`;
+      });
+
+      // ---- 修改箭头方向 ----
+      updateArrowBtn.addEventListener('click', () => {
+        const sel = SE.selection.getSelection();
+        if (!sel.id || sel.type !== 'connection') {
+          alert('请先点击选中一条连线');
+          return;
+        }
+        SE.setArrow(sel.id, { direction: 'both' });
+        statusEl.textContent = `✅ 箭头方向已改为 both`;
+      });
+
+      console.log('💡 点击节点或连线，然后使用文本框和按钮修改标签/箭头');
+    </script>
+  </body>
+</html>

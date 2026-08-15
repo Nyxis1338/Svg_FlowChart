@@ -45,6 +45,7 @@ export interface Node {
   width: number;
   height: number;
   label?: string;
+  description?: string; // 提示文字
   shape?: NodeShape;
   fill?: string;
   stroke?: string;
@@ -77,6 +78,7 @@ export interface Connection {
   stroke?: string;
   strokeWidth?: number;
   label?: LabelConfig;
+  description?: string;
   arrow?: ArrowConfig;
   selected?: boolean;
   fixed?: boolean; // 是否固定（不可拖拽），默认 false

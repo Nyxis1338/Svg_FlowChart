@@ -3,6 +3,7 @@
 import { SvgEngine } from './core/SvgEngine';
 import { ConnectorColors } from './utils/colors';
 import { NodeShape } from './types/SvgModel';
+import { describe } from 'node:test';
 
 function randomColor(): string {
   return ConnectorColors[Math.floor(Math.random() * ConnectorColors.length)];
@@ -53,6 +54,7 @@ const nodeA = SE.addNode({
   height: 90,
   label: '矩形A',
   shape: 'rectangle',
+  description: '这是流程的起始节点，点击可测试',
 });
 (window as any).nodeA = nodeA;
 addDefaultAnchors(SE, nodeA.id);
@@ -127,6 +129,8 @@ const cBottomIn = getAnchor(SE, nodeC.id, 'bottom');
   connectorType: 'flowchart',
   stroke: randomColor(),
   strokeWidth: 2,
+  label: { text: '折线', fontSize: 12, color: '#333' },
+  description: '又一个折线',
 });
 
 // ==================== UI 按钮 ====================

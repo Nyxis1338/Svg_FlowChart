@@ -33,10 +33,10 @@ npm install svg-flow-chart
 import { SvgEngine } from 'svg-flow-chart';
 
 const container = document.getElementById('container');
-const engine = new SvgEngine(container);
+const SE = new SvgEngine(container);
 
 // 创建节点
-const nodeA = engine.addNode({
+const nodeA = SE.addNode({
   x: 100,
   y: 100,
   width: 140,
@@ -45,15 +45,15 @@ const nodeA = engine.addNode({
   shape: 'rectangle',
 });
 
-// 创建锚点
-engine.addAnchor({
+// 创建锚点（支持批量）
+SE.addAnchor({
   nodeId: nodeA.id,
-  position: 'right',
+  position: ['top', 'right', 'bottom', 'left'],
   radius: 5,
 });
 
 // 创建连线
-engine.addConnection({
+SE.addConnection({
   sourceAnchorId: anchorA.id,
   targetAnchorId: anchorB.id,
   connectorType: 'flowchart',
@@ -64,11 +64,12 @@ engine.addConnection({
 
 ### 使用（UMD）
 
-```html
+```typescript
+<div id="container"></div>
 <script src="dist/svgflow.umd.js"></script>
 <script>
   const { SvgEngine } = window.SvgFlow;
-  const engine = new SvgEngine(document.getElementById('container'));
+  const SE = new SvgEngine(document.getElementById('container'));
   // ... 同上
 </script>
 ```
@@ -77,110 +78,164 @@ engine.addConnection({
 
 ## 🎨 核心 API
 
-### 节点操作
+所有 API 通过 `SvgEngine` 实例调用（通常命名为 `SE`）。
+
+### 节点操作（Node）
+
+| API                       | 说明               | 常用参数                                                                  |
+| :------------------------ | :----------------- | :------------------------------------------------------------------------ |
+| `addNode(data)`           | 添加节点           | `{ x, y, width?, height?, label?, shape?, fill?, stroke?, strokeWidth? }` |
+| `getNode(id)`             | 获取节点           | `id: string`                                                              |
+| `getAllNodes()`           | 获取所有节点       | 无                                                                        |
+| `updateNode(id, updates)` | 更新节点           | `id: string, updates: Partial<Node>`                                      |
+| `removeNode(id)`          | 删除节点           | `id: string`                                                              |
+| `getNodeAnchors(nodeId)`  | 获取节点的所有锚点 | `nodeId: string`                                                          |
+
+**示例**：
 
 ```typescript
-// 添加节点
-const node = engine.addNode({
-  x: number,
-  y: number,
-  width: number,
-  height: number,
-  label?: string,
-  shape?: 'rectangle' | 'circle' | 'diamond' | 'ellipse',
-  fill?: string,
-  stroke?: string,
-  strokeWidth?: number,
+const node = SE.addNode({ x: 100, y: 100, label: '开始', shape: 'rectangle' });
+SE.updateNode(node.id, { fill: '#ffcccc' });
+```
+
+---
+
+### 锚点操作（Anchor）
+
+| API                         | 说明                   | 常用参数                                                                                                                      |
+| :-------------------------- | :--------------------- | :---------------------------------------------------------------------------------------------------------------------------- |
+| `addAnchor(data)`           | 添加锚点（单个或批量） | `{ nodeId, position, radius?, fill?, stroke? }`<br/>`position` 支持单个或数组：`'right'` 或 `['top','right','bottom','left']` |
+| `getAllAnchors()`           | 获取所有锚点           | 无                                                                                                                            |
+| `getNodeAnchors(nodeId)`    | 获取节点的所有锚点     | `nodeId: string`                                                                                                              |
+| `updateAnchor(id, updates)` | 更新锚点               | `id: string, updates: Partial<Anchor>`                                                                                        |
+| `removeAnchor(id)`          | 删除锚点               | `id: string`                                                                                                                  |
+
+**示例**：
+
+```typescript
+// 单个
+SE.addAnchor({ nodeId: node.id, position: 'right', radius: 6 });
+
+// 批量
+SE.addAnchor({ nodeId: node.id, position: ['top', 'right', 'bottom', 'left'], radius: 6 });
+```
+
+---
+
+### 连线操作（Connection）
+
+| API                             | 说明         | 常用参数                                                                                                 |
+| :------------------------------ | :----------- | :------------------------------------------------------------------------------------------------------- |
+| `addConnection(data)`           | 添加连线     | `{ sourceAnchorId, targetAnchorId, connectorType?, stroke?, strokeWidth?, stub?, gap?, arrow?, label? }` |
+| `getConnection(id)`             | 获取连线     | `id: string`                                                                                             |
+| `getAllConnections()`           | 获取所有连线 | 无                                                                                                       |
+| `updateConnection(id, updates)` | 更新连线     | `id: string, updates: Partial<Connection>`                                                               |
+| `removeConnection(id)`          | 删除连线     | `id: string`                                                                                             |
+
+**示例**：
+
+```typescript
+SE.addConnection({
+  sourceAnchorId: anchorA.id,
+  targetAnchorId: anchorB.id,
+  connectorType: 'flowchart',
+  stroke: '#27ae60',
+  arrow: { direction: 'target', length: 14, type: 'triangle' },
+  stub: 20,
+  gap: 5,
 });
-
-// 获取/更新/删除节点
-engine.getNode(id);
-engine.updateNode(id, updates);
-engine.removeNode(id);
 ```
 
-### 锚点操作
+---
+
+### 批量更新（Batch Update）
+
+| API                             | 说明             | 常用参数                                    |
+| :------------------------------ | :--------------- | :------------------------------------------ |
+| `updateAllNodes(updates)`       | 更新所有节点样式 | `{ fill?, stroke?, strokeWidth? }`          |
+| `updateAllConnections(updates)` | 更新所有连线样式 | `{ stroke?, strokeWidth?, arrow?, label? }` |
+| `updateAllAnchors(updates)`     | 更新所有锚点样式 | `{ radius?, fill?, stroke? }`               |
+
+**示例**：
 
 ```typescript
-// 添加锚点
-engine.addAnchor({
-  nodeId: string,
-  position: 'top' | 'right' | 'bottom' | 'left' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right',
-  radius?: number,
-  fill?: string,
-  stroke?: string,
-});
-
-engine.getNodeAnchors(nodeId);
-engine.removeAnchor(id);
+SE.updateAllNodes({ fill: '#ffcccc' });
+SE.updateAllConnections({ stroke: '#4caf50', strokeWidth: 3 });
 ```
 
-新增写法（批量添加 注意是加了's'）：
+---
+
+### 视图控制（Viewport）
+
+| API                   | 说明           | 常用参数                      |
+| :-------------------- | :------------- | :---------------------------- |
+| `zoomIn(factor?)`     | 放大           | `factor?: number`（默认 0.1） |
+| `zoomOut(factor?)`    | 缩小           | `factor?: number`（默认 0.1） |
+| `zoomTo(scale)`       | 缩放到指定比例 | `scale: number`（0.3 ~ 3）    |
+| `resetView()`         | 重置视图       | 无                            |
+| `fitToView(padding?)` | 适配所有节点   | `padding?: number`（默认 50） |
+
+---
+
+### 数据导入/导出
+
+| API                | 说明         | 常用参数          |
+| :----------------- | :----------- | :---------------- |
+| `exportData()`     | 导出所有数据 | 无                |
+| `importData(data)` | 导入数据     | `data: StoreData` |
+
+---
+
+## 🎯 配置参数详解
+
+### 连线类型（connectorType）
+
+| 值            | 说明                             |
+| :------------ | :------------------------------- |
+| `'straight'`  | 直线                             |
+| `'bezier'`    | 贝塞尔曲线                       |
+| `'flowchart'` | 正交折线（推荐，带 stub 和 gap） |
+
+### 箭头配置（ArrowConfig）
+
+| 字段        | 类型                                       | 说明                             |
+| :---------- | :----------------------------------------- | :------------------------------- |
+| `direction` | `'none' \| 'source' \| 'target' \| 'both'` | 箭头位置和指向                   |
+| `type`      | `'triangle' \| 'fork'`                     | 箭头样式                         |
+| `length`    | `number`                                   | 箭头长度                         |
+| `width`     | `number`                                   | 箭头宽度                         |
+| `color`     | `string`                                   | 箭头颜色（可选，默认与连线同色） |
+
+**示例**：
 
 ```typescript
-engine.addAnchors({
-  nodeId: nodeA.id,
-  ['top', 'right', 'bottom', 'left'],
-  {radius: 5}
-});
+arrow: { direction: 'target', type: 'triangle', length: 16, width: 10 }
 ```
 
-### 连线操作
+### 标签配置（LabelConfig）
 
-```typescript
-// 添加连线
-engine.addConnection({
-  sourceAnchorId: string,
-  targetAnchorId: string,
-  connectorType: 'straight' | 'bezier' | 'flowchart',
-  stroke?: string,
-  strokeWidth?: number,
-  stub?: number,     // stub 长度
-  gap?: number,      // 间隙
-  arrow?: {
-    direction: 'none' | 'source' | 'target' | 'both',
-    type?: 'triangle' | 'fork',
-    length?: number,
-    width?: number,
-    color?: string,
-  },
-  label?: {
-    text: string,
-    fontSize?: number,
-    color?: string,
-    offset?: { x: number; y: number },
-  },
-});
+| 字段       | 类型       | 说明     |
+| :--------- | :--------- | :------- |
+| `text`     | `string`   | 标签文本 |
+| `fontSize` | `number`   | 字号     |
+| `color`    | `string`   | 颜色     |
+| `offset`   | `{ x, y }` | 偏移量   |
 
-engine.updateConnection(id, updates);
-engine.removeConnection(id);
-```
+### 节点形状（shape）
 
-### 批量更新
+| 值            | 说明         |
+| :------------ | :----------- |
+| `'rectangle'` | 矩形（默认） |
+| `'circle'`    | 圆形         |
+| `'diamond'`   | 菱形         |
+| `'ellipse'`   | 椭圆         |
 
-```typescript
-// 批量更新所有节点/连线/锚点样式
-engine.updateAllNodes({ fill: '#ffcccc' });
-engine.updateAllConnections({ stroke: '#4caf50' });
-engine.updateAllAnchors({ radius: 8 });
-```
+### 锚点位置（position）
 
-### 视图控制
-
-```typescript
-engine.zoomIn(); // 放大
-engine.zoomOut(); // 缩小
-engine.zoomTo(1.5); // 缩放到指定比例
-engine.resetView(); // 重置视图
-engine.fitToView(30); // 适配所有节点
-```
-
-### 导入/导出
-
-```typescript
-const data = engine.exportData(); // 导出 JSON
-engine.importData(data); // 导入 JSON
-```
+| 值                                                             | 说明     |
+| :------------------------------------------------------------- | :------- |
+| `'top'`、`'right'`、`'bottom'`、`'left'`                       | 四边中点 |
+| `'top-left'`、`'top-right'`、`'bottom-left'`、`'bottom-right'` | 四个角   |
 
 ---
 
@@ -200,6 +255,40 @@ import { Defaults } from 'svg-flow-chart';
 
 Defaults.node.stroke = '#your-color';
 Defaults.connection.stroke = '#your-color';
+```
+
+---
+
+## ✅ 完整示例
+
+```typescript
+import { SvgEngine } from 'svg-flowchart';
+
+const SE = new SvgEngine(container);
+
+// 节点
+const nodeA = SE.addNode({ x: 100, y: 100, width: 140, height: 90, label: 'A', shape: 'rectangle' });
+const nodeB = SE.addNode({ x: 400, y: 100, width: 140, height: 90, label: 'B', shape: 'rectangle' });
+
+// 锚点（批量）
+const anchorsA = SE.addAnchor({ nodeId: nodeA.id, position: ['top', 'right', 'bottom', 'left'], radius: 6 });
+const anchorsB = SE.addAnchor({ nodeId: nodeB.id, position: ['top', 'right', 'bottom', 'left'], radius: 6 });
+
+// 连线
+SE.addConnection({
+  sourceAnchorId: anchorsA[1].id, // right
+  targetAnchorId: anchorsB[2].id, // left
+  connectorType: 'flowchart',
+  stroke: '#27ae60',
+  strokeWidth: 3,
+  stub: 20,
+  gap: 5,
+  arrow: { direction: 'target', type: 'triangle', length: 16 },
+  label: { text: '流程', fontSize: 14, color: '#333' },
+});
+
+// 适配视图
+SE.fitToView(30);
 ```
 
 ---

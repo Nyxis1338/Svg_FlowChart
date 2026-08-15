@@ -5,7 +5,7 @@ import { ViewportManager } from './viewport/ViewportManager';
 import { SelectionManager } from './selection/SelectionManager';
 import { DragManager } from './interaction/DragManager';
 import { SvgRenderer } from './renderer/SvgRenderer';
-import type { Node, Connection, Anchor, AnchorPosition } from '../types/SvgModel';
+import type { Node, Connection, Anchor, AnchorPosition, ArrowConfig } from '../types/SvgModel';
 import type { Point } from '../types/geometry';
 import { EventBus } from './interaction/EventBus';
 import { ContextMenu } from './interaction/ContextMenu';
@@ -225,6 +225,60 @@ export class SvgEngine {
 
   importData(data: any) {
     this.store.importData(data);
+  }
+
+  // ==================== 简化操作 ====================
+
+  /**
+   * 设置标签文本（节点或连线）
+   * @param id 节点 ID 或连线 ID
+   * @param text 标签文本
+   */
+  setLabel(id: string, text: string): void {
+    // 先尝试作为节点
+    const node = this.store.getNode(id);
+    if (node) {
+      this.store.updateNode(id, { label: text });
+      return;
+    }
+    // 再尝试作为连线
+    const conn = this.store.getConnection(id);
+    if (conn) {
+      const currentLabel = conn.label || {};
+      this.store.updateConnection(id, {
+        label: { ...currentLabel, text },
+      });
+      return;
+    }
+    console.warn(`未找到 ID 为 ${id} 的节点或连线`);
+  }
+
+  /**
+   * 设置连线箭头
+   * @param id 连线 ID
+   * @param options 箭头配置（只取有效字段）
+   */
+  setArrow(id: string, options: Partial<ArrowConfig>): void {
+    const conn = this.store.getConnection(id);
+    if (!conn) {
+      console.warn(`未找到 ID 为 ${id} 的连线`);
+      return;
+    }
+
+    const validKeys: (keyof ArrowConfig)[] = ['direction', 'type', 'length', 'width', 'color'];
+    const filtered: Partial<ArrowConfig> = {};
+    for (const key of validKeys) {
+      const value = options[key];
+      if (value !== undefined) {
+        // 使用 as 断言，但只对 value 做断言
+        (filtered as any)[key] = value;
+      }
+    }
+
+    const currentArrow = conn.arrow || {};
+    this.store.updateConnection(id, {
+      arrow: { ...currentArrow, ...filtered },
+    });
   }
 
   // ==================== 销毁 ====================

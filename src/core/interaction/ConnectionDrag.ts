@@ -11,7 +11,6 @@ import { Defaults } from '../../styles/defaults';
 import { HitTest } from './HitTest';
 import type { DragManager } from './DragManager';
 import { getAnchorOrientation } from '../../calc/anchor/orientation';
-import { Geometry } from '../../calc/geometry';
 
 /**
  * 连线拖拽执行器（统一处理创建和重连）
@@ -112,7 +111,6 @@ export class ConnectionDrag {
       endX: anchorPos.x,
       endY: anchorPos.y,
       type: 'create',
-      dragDirection: 'output',
       orientation,
       connectorType: 'straight',
       stroke: Defaults.connection.stroke,
@@ -121,14 +119,11 @@ export class ConnectionDrag {
   }
 
   private handleReconnect(anchor: Anchor, conn: Connection, anchorPos: Point, _evt: MouseEvent): void {
-    let dragDirection: 'output' | 'input';
     let fixedAnchorId: string;
 
     if (conn.sourceAnchorId === anchor.id) {
-      dragDirection = 'output';
       fixedAnchorId = conn.targetAnchorId!;
     } else if (conn.targetAnchorId === anchor.id) {
-      dragDirection = 'input';
       fixedAnchorId = conn.sourceAnchorId!;
     } else {
       return;
@@ -155,7 +150,6 @@ export class ConnectionDrag {
       connectionId: conn.id,
       oldSourceAnchorId: conn.sourceAnchorId,
       oldTargetAnchorId: conn.targetAnchorId,
-      dragDirection,
       orientation,
       stroke,
       strokeWidth,
@@ -215,7 +209,6 @@ export class ConnectionDrag {
     const isReconnect = data.type === 'reconnect';
     let success = false;
 
-    const dragDir = data.dragDirection;
     console.log(`[onMouseUp] 目标锚点: ${hitAnchor?.id || '无'}`);
 
     if (hitAnchor && sourceAnchor) {
@@ -225,7 +218,7 @@ export class ConnectionDrag {
         success = this._handleDrop(sourceAnchor, hitAnchor, isReconnect);
       }
     } else {
-      console.warn(`⏭️ 未命中有效目标锚点，取消操作。拖拽端方向=${dragDir}`);
+      console.warn(`⏭️ 未命中有效目标锚点，取消操作`);
     }
 
     // 清理
@@ -304,11 +297,12 @@ export class ConnectionDrag {
     const conn = this.store.getConnection(connId);
     if (!conn) return false;
 
-    const dragDir = data.dragDirection;
+    // 判断拖拽的是源端还是目标端
+    const isSourceEnd = data.fixedAnchorId === conn.targetAnchorId; // 固定的是目标，拖拽的是源
     let newSourceId = conn.sourceAnchorId;
     let newTargetId = conn.targetAnchorId;
 
-    if (dragDir === 'output') {
+    if (isSourceEnd) {
       newSourceId = hitAnchor.id;
     } else {
       newTargetId = hitAnchor.id;

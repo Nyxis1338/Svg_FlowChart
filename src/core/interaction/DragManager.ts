@@ -28,7 +28,6 @@ export class DragManager {
     connectionId?: string;
     oldTargetAnchorId?: string;
     oldSourceAnchorId?: string;
-    dragDirection: 'output' | 'input';
     stroke?: string;
     strokeWidth?: number;
     connectorType?: any;

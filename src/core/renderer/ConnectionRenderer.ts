@@ -73,7 +73,12 @@ export class ConnectionRenderer {
         const labelEl = this.renderLabel(conn.label, { start, end, pathD });
         if (labelEl) g.appendChild(labelEl);
       }
-
+      // ----Tootip ----
+      if (conn.description || conn.label?.text) {
+        const title = createSvgElement('title') as SVGTitleElement;
+        title.textContent = conn.description || conn.label?.text || '';
+        g.appendChild(title);
+      }
       this.elementLayer.appendChild(g);
     }
   }

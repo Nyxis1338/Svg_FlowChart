@@ -60,6 +60,11 @@ export class NodeRenderer {
         text.textContent = node.label;
         g.appendChild(text);
       }
+      if (node.description || node.label) {
+        const title = createSvgElement('title') as SVGTitleElement;
+        title.textContent = node.description || node.label || '';
+        g.appendChild(title);
+      }
 
       this.elementLayer.appendChild(g);
 

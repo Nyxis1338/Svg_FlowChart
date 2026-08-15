@@ -356,7 +356,7 @@ function m(n, r, i) {
 	w = C === "flowchart" ? p(b, x) : C === "bezier" ? f(b, x) : d(b, x);
 	let T = w.path, E = w.startDirection, D = w.endDirection, O = T.replace(/^M/, "L");
 	return {
-		pathD: `M ${y.x} ${y.y} ${O} L ${S.x} ${S.y}`,
+		pathD: ` M ${y.x} ${y.y} ${O} L ${S.x} ${S.y}`,
 		startDirection: E,
 		endDirection: D,
 		rawStart: h,
