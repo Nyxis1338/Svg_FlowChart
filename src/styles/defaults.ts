@@ -23,15 +23,32 @@ export const Defaults = {
   },
 
   /** 锚点默认样式 */
+  // anchor: {
+  //   radius: 5,
+  //   fill: '#ffffff',
+  //   stroke: '#5470c6', // 蓝紫色，保持与节点边框区分
+  //   strokeWidth: 2,
+  //   hoverStroke: '#ff6b6b',
+  //   hoverStrokeWidth: 3,
+  //   hoverRadiusMultiplier: 1.6,
+  //   hoverShadow: 'drop-shadow(0 0 8px rgba(255,107,107,0.5))',
+  // },
+
   anchor: {
     radius: 5,
     fill: '#ffffff',
-    stroke: '#5470c6', // 蓝紫色，保持与节点边框区分
+    stroke: '#5470c6',
     strokeWidth: 2,
+    // 选中样式（点击锚点后）
+    selectedStroke: '#ff6b6b',
+    selectedStrokeWidth: 3,
+    selectedRadiusMultiplier: 1.4, // 适度放大
+    selectedShadow: 'drop-shadow(0 0 6px rgba(255,107,107,0.4))',
+    // 拖拽悬停样式（拖拽到锚点上方）- 强调模糊阴影感
     hoverStroke: '#ff6b6b',
     hoverStrokeWidth: 3,
-    hoverRadiusMultiplier: 1.6,
-    hoverShadow: 'drop-shadow(0 0 8px rgba(255,107,107,0.5))',
+    hoverRadiusMultiplier: 1.4, // 与选中保持一致，避免尺寸突变
+    hoverShadow: 'drop-shadow(0 0 18px rgba(255,107,107,0.8)) drop-shadow(0 0 8px rgba(255,107,107,0.5))', // 双重模糊阴影
   },
 
   /** 连线默认样式 */

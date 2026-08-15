@@ -70,22 +70,58 @@ export class NodeRenderer {
 
       // ---- 锚点（独立添加，zIndex 比节点高 1） ----
       const anchors = this.store.getNodeAnchors(node.id);
+      // for (const ap of anchors) {
+      //   const pos = this.store.calcAnchorPosForNode(node, ap);
+      //   const circle = createSvgElement('circle') as SVGCircleElement;
+      //   const radius = ap.radius ?? Defaults.anchor.radius;
+      //   circle.setAttribute('cx', String(pos.x));
+      //   circle.setAttribute('cy', String(pos.y));
+      //   circle.setAttribute('r', String(radius));
+      //   circle.style.cursor = 'default';
+      //   circle.style.transition = 'all 0.15s ease-out';
+      //   circle.dataset['anchorId'] = ap.id;
+      //   circle.dataset['zIndex'] = String(nodeZ + 1);
+      //   circle.dataset['nodeId'] = node.id;
+
+      //   circle.setAttribute('fill', ap.fill ?? Defaults.anchor.fill);
+      //   circle.setAttribute('stroke', ap.stroke ?? Defaults.anchor.stroke);
+      //   circle.setAttribute('stroke-width', String(ap.strokeWidth ?? Defaults.anchor.strokeWidth));
+      //   this.elementLayer.appendChild(circle);
+      // }
       for (const ap of anchors) {
         const pos = this.store.calcAnchorPosForNode(node, ap);
         const circle = createSvgElement('circle') as SVGCircleElement;
-        const radius = ap.radius ?? Defaults.anchor.radius;
+        const baseRadius = ap.radius ?? Defaults.anchor.radius;
         circle.setAttribute('cx', String(pos.x));
         circle.setAttribute('cy', String(pos.y));
-        circle.setAttribute('r', String(radius));
         circle.style.cursor = 'default';
         circle.style.transition = 'all 0.15s ease-out';
         circle.dataset['anchorId'] = ap.id;
         circle.dataset['zIndex'] = String(nodeZ + 1);
         circle.dataset['nodeId'] = node.id;
 
+        // 判断状态：选中 > 普通
+        const isSelected = this.selection.isSelected('anchor', ap.id);
+
+        let radius, stroke, strokeWidth, filter;
+        if (isSelected) {
+          radius = baseRadius * Defaults.anchor.selectedRadiusMultiplier;
+          stroke = Defaults.anchor.selectedStroke;
+          strokeWidth = Defaults.anchor.selectedStrokeWidth;
+          filter = Defaults.anchor.selectedShadow;
+        } else {
+          radius = baseRadius;
+          stroke = ap.stroke ?? Defaults.anchor.stroke;
+          strokeWidth = ap.strokeWidth ?? Defaults.anchor.strokeWidth;
+          filter = 'none';
+        }
+
+        circle.setAttribute('r', String(radius));
+        circle.setAttribute('stroke', stroke);
+        circle.setAttribute('stroke-width', String(strokeWidth));
         circle.setAttribute('fill', ap.fill ?? Defaults.anchor.fill);
-        circle.setAttribute('stroke', ap.stroke ?? Defaults.anchor.stroke);
-        circle.setAttribute('stroke-width', String(ap.strokeWidth ?? Defaults.anchor.strokeWidth));
+        circle.setAttribute('filter', filter);
+
         this.elementLayer.appendChild(circle);
       }
     }
@@ -101,17 +137,35 @@ export class NodeRenderer {
       const baseRadius = ap?.radius ?? Defaults.anchor.radius;
 
       if (highlight) {
+        // 拖拽悬停：适中的放大 + 强烈的模糊阴影感
         const hoverRadius = baseRadius * Defaults.anchor.hoverRadiusMultiplier;
         circle.setAttribute('r', String(hoverRadius));
         circle.setAttribute('stroke', Defaults.anchor.hoverStroke);
         circle.setAttribute('stroke-width', String(Defaults.anchor.hoverStrokeWidth));
         circle.setAttribute('filter', Defaults.anchor.hoverShadow);
       } else {
-        circle.setAttribute('r', String(baseRadius));
-        circle.setAttribute('stroke', ap?.stroke ?? Defaults.anchor.stroke);
-        circle.setAttribute('fill', ap?.fill ?? Defaults.anchor.fill);
-        circle.setAttribute('stroke-width', String(ap?.strokeWidth ?? Defaults.anchor.strokeWidth));
-        circle.setAttribute('filter', 'none');
+        // circle.setAttribute('r', String(baseRadius));
+        // circle.setAttribute('stroke', ap?.stroke ?? Defaults.anchor.stroke);
+        // circle.setAttribute('fill', ap?.fill ?? Defaults.anchor.fill);
+        // circle.setAttribute('stroke-width', String(ap?.strokeWidth ?? Defaults.anchor.strokeWidth));
+        // circle.setAttribute('filter', 'none');
+        // 取消高亮：恢复为普通状态（或选中状态，取决于是否选中）
+        const isSelected = this.selection.isSelected('anchor', anchorId);
+        if (isSelected) {
+          // 恢复为选中状态
+          const selRadius = baseRadius * Defaults.anchor.selectedRadiusMultiplier;
+          circle.setAttribute('r', String(selRadius));
+          circle.setAttribute('stroke', Defaults.anchor.selectedStroke);
+          circle.setAttribute('stroke-width', String(Defaults.anchor.selectedStrokeWidth));
+          circle.setAttribute('filter', Defaults.anchor.selectedShadow);
+        } else {
+          // 恢复为普通状态
+          circle.setAttribute('r', String(baseRadius));
+          circle.setAttribute('stroke', ap?.stroke ?? Defaults.anchor.stroke);
+          circle.setAttribute('fill', ap?.fill ?? Defaults.anchor.fill);
+          circle.setAttribute('stroke-width', String(ap?.strokeWidth ?? Defaults.anchor.strokeWidth));
+          circle.setAttribute('filter', 'none');
+        }
       }
     }
   }

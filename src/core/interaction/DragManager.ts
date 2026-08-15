@@ -70,12 +70,13 @@ export class DragManager {
 
   public startLinkDrag(anchor: Anchor, evt: MouseEvent): void {
     if (this.state !== 'idle') return;
-    const existingConnection = this.store.findConnectionByAnchor(anchor.id);
-    const isReconnect = existingConnection !== undefined && !this.store.isAnchorFull(anchor.id);
 
     this.currentExecutor = new ConnectionDrag(this);
     this.currentExecutor.start(anchor, evt);
     this.bindDragEvents();
+
+    // 再触发选中（确保拖拽状态已锁定）
+    this.selection.select('anchor', anchor.id);
     evt.preventDefault();
   }
 
