@@ -209,8 +209,6 @@ export class ConnectionDrag {
     const isReconnect = data.type === 'reconnect';
     let success = false;
 
-    console.log(`[onMouseUp] 目标锚点: ${hitAnchor?.id || '无'}`);
-
     if (hitAnchor && sourceAnchor) {
       if (hitAnchor.id === sourceAnchor.id) {
         console.warn(`⏭️ 目标锚点与源锚点相同，取消操作`);

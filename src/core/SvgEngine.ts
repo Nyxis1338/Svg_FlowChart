@@ -281,6 +281,31 @@ export class SvgEngine {
     });
   }
 
+  /**
+   * 获取指定节点上指定位置的锚点 ID
+   * @param nodeId 节点 ID
+   * @param positions 位置字符串或位置数组
+   * @returns 返回一个对象，键为位置，值为锚点 ID（若不存在则为 null）
+   *
+   * @example
+   * // 获取单个位置
+   * const ids = SE.getAnchorId('node-1', 'top'); // { top: 'anchor-xxx' }
+   *
+   * // 获取多个位置
+   * const ids = SE.getAnchorId('node-1', ['top', 'right']);
+   * // { top: 'anchor-xxx', right: 'anchor-yyy' }
+   */
+  getAnchorId(nodeId: string, positions: AnchorPosition | AnchorPosition[]): Record<AnchorPosition, string | null> {
+    const anchors = this.store.getNodeAnchors(nodeId);
+    const posList = Array.isArray(positions) ? positions : [positions];
+    const result: Record<AnchorPosition, string | null> = {} as any;
+    for (const pos of posList) {
+      const anchor = anchors.find(a => a.position === pos);
+      result[pos] = anchor?.id || null;
+    }
+    return result;
+  }
+
   // ==================== 销毁 ====================
   destroy(): void {
     this.dragManager.destroy();

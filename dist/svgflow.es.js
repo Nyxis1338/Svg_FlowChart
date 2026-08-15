@@ -793,7 +793,6 @@ var _ = class {
 			endX: n.x,
 			endY: n.y,
 			type: "create",
-			dragDirection: "output",
 			orientation: a,
 			connectorType: "straight",
 			stroke: e.connection.stroke,
@@ -801,31 +800,30 @@ var _ = class {
 		};
 	}
 	handleReconnect(t, n, r, i) {
-		let a, o;
-		if (n.sourceAnchorId === t.id) a = "output", o = n.targetAnchorId;
-		else if (n.targetAnchorId === t.id) a = "input", o = n.sourceAnchorId;
+		let a;
+		if (n.sourceAnchorId === t.id) a = n.targetAnchorId;
+		else if (n.targetAnchorId === t.id) a = n.sourceAnchorId;
 		else return;
-		let s = this.store.getAnchor(o);
+		let o = this.store.getAnchor(a);
+		if (!o) return;
+		let s = this.store.getNode(o.nodeId);
 		if (!s) return;
-		let l = this.store.getNode(s.nodeId);
-		if (!l) return;
-		let u = this.store.calcAnchorPosForNode(l, s), d = c(l, s), f = n.stroke || e.connection.stroke, p = n.strokeWidth || e.connection.strokeWidth, m = n.connectorType;
+		let l = this.store.calcAnchorPosForNode(s, o), u = c(s, o), d = n.stroke || e.connection.stroke, f = n.strokeWidth || e.connection.strokeWidth, p = n.connectorType;
 		this.dragManager.linkDragData = {
 			sourceAnchorId: t.id,
-			startX: u.x,
-			startY: u.y,
+			startX: l.x,
+			startY: l.y,
 			endX: r.x,
 			endY: r.y,
 			type: "reconnect",
 			connectionId: n.id,
 			oldSourceAnchorId: n.sourceAnchorId,
 			oldTargetAnchorId: n.targetAnchorId,
-			dragDirection: a,
-			orientation: d,
-			stroke: f,
-			strokeWidth: p,
-			connectorType: m,
-			fixedAnchorId: o
+			orientation: u,
+			stroke: d,
+			strokeWidth: f,
+			connectorType: p,
+			fixedAnchorId: a
 		}, this.renderer.setReconnecting(n.id, !0), this.renderer.highlightAnchor(t.id, !0);
 	}
 	processMove(e) {
@@ -841,8 +839,8 @@ var _ = class {
 		let n = this.viewport.screenToCanvas({
 			x: e.clientX,
 			y: e.clientY
-		}), r = this.hitTest.findNearestAnchor(n, this.store, t.sourceAnchorId), i = this.store.getAnchor(t.sourceAnchorId), a = t.type === "reconnect", o = t.dragDirection;
-		console.log(`[onMouseUp] 目标锚点: ${r?.id || "无"}`), r && i ? r.id === i.id ? console.warn("⏭️ 目标锚点与源锚点相同，取消操作") : this._handleDrop(i, r, a) : console.warn(`⏭️ 未命中有效目标锚点，取消操作。拖拽端方向=${o}`), a && t.connectionId && this.renderer.setReconnecting(t.connectionId, !1), this.clearHighlight(), this.renderer.clearTempLine(), this._resetDragState();
+		}), r = this.hitTest.findNearestAnchor(n, this.store, t.sourceAnchorId), i = this.store.getAnchor(t.sourceAnchorId), a = t.type === "reconnect";
+		r && i ? r.id === i.id ? console.warn("⏭️ 目标锚点与源锚点相同，取消操作") : this._handleDrop(i, r, a) : console.warn("⏭️ 未命中有效目标锚点，取消操作"), a && t.connectionId && this.renderer.setReconnecting(t.connectionId, !1), this.clearHighlight(), this.renderer.clearTempLine(), this._resetDragState();
 	}
 	cancel() {
 		this._resetDragState(), this.renderer.clearTempLine(), this.clearHighlight();
@@ -876,8 +874,8 @@ var _ = class {
 		if (!n) return !1;
 		let r = n.connectionId, i = this.store.getConnection(r);
 		if (!i) return !1;
-		let a = n.dragDirection, o = i.sourceAnchorId, s = i.targetAnchorId;
-		return a === "output" ? o = t.id : s = t.id, o === i.sourceAnchorId && s === i.targetAnchorId ? (console.log("⏭️ 目标未变化，取消重连"), !1) : this.store.getAllConnections().some((e) => e.id !== r && e.sourceAnchorId === o && e.targetAnchorId === s) ? (console.warn("连线已存在，重连取消"), !1) : (this.store.updateConnection(r, {
+		let a = n.fixedAnchorId === i.targetAnchorId, o = i.sourceAnchorId, s = i.targetAnchorId;
+		return a ? o = t.id : s = t.id, o === i.sourceAnchorId && s === i.targetAnchorId ? (console.log("⏭️ 目标未变化，取消重连"), !1) : this.store.getAllConnections().some((e) => e.id !== r && e.sourceAnchorId === o && e.targetAnchorId === s) ? (console.warn("连线已存在，重连取消"), !1) : (this.store.updateConnection(r, {
 			sourceAnchorId: o,
 			targetAnchorId: s
 		}), console.log("✅ 重连成功"), !0);
@@ -1011,6 +1009,10 @@ var _ = class {
 				let t = g("text"), i = n.x + n.width / 2, a = n.y + n.height / 2 + e.node.labelOffsetY;
 				t.setAttribute("x", String(i)), t.setAttribute("y", String(a)), t.setAttribute("text-anchor", "middle"), t.setAttribute("fill", e.node.labelColor), t.setAttribute("font-size", String(e.node.labelFontSize)), t.setAttribute("font-family", "sans-serif"), t.textContent = n.label, r.appendChild(t);
 			}
+			if (n.description || n.label) {
+				let e = g("title");
+				e.textContent = n.description || n.label || "", r.appendChild(e);
+			}
 			this.elementLayer.appendChild(r);
 			let u = this.store.getNodeAnchors(n.id);
 			for (let r of u) {
@@ -1078,6 +1080,10 @@ var _ = class {
 					pathD: o
 				});
 				e && u.appendChild(e);
+			}
+			if (r.description || r.label?.text) {
+				let e = g("title");
+				e.textContent = r.description || r.label?.text || "", u.appendChild(e);
 			}
 			this.elementLayer.appendChild(u);
 		}
@@ -1495,6 +1501,50 @@ var M = class {
 	}
 	importData(e) {
 		this.store.importData(e);
+	}
+	setLabel(e, t) {
+		if (this.store.getNode(e)) {
+			this.store.updateNode(e, { label: t });
+			return;
+		}
+		let n = this.store.getConnection(e);
+		if (n) {
+			let r = n.label || {};
+			this.store.updateConnection(e, { label: {
+				...r,
+				text: t
+			} });
+			return;
+		}
+		console.warn(`未找到 ID 为 ${e} 的节点或连线`);
+	}
+	setArrow(e, t) {
+		let n = this.store.getConnection(e);
+		if (!n) {
+			console.warn(`未找到 ID 为 ${e} 的连线`);
+			return;
+		}
+		let r = [
+			"direction",
+			"type",
+			"length",
+			"width",
+			"color"
+		], i = {};
+		for (let e of r) {
+			let n = t[e];
+			n !== void 0 && (i[e] = n);
+		}
+		let a = n.arrow || {};
+		this.store.updateConnection(e, { arrow: {
+			...a,
+			...i
+		} });
+	}
+	getAnchorId(e, t) {
+		let n = this.store.getNodeAnchors(e), r = Array.isArray(t) ? t : [t], i = {};
+		for (let e of r) i[e] = n.find((t) => t.position === e)?.id || null;
+		return i;
 	}
 	destroy() {
 		this.dragManager.destroy(), this.renderer.destroy(), this.viewport.destroy(), this.contextMenu.destroy(), this.svgRoot.remove();

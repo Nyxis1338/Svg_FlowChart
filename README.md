@@ -291,6 +291,77 @@ SE.addConnection({
 SE.fitToView(30);
 ```
 
+### 便捷 API（Convenience APIs）
+
+| API                              | 说明                            | 常用参数                                                        |
+| :------------------------------- | :------------------------------ | :-------------------------------------------------------------- |
+| `setLabel(id, text)`             | 设置节点或连线的标签文本        | `id: string, text: string`                                      |
+| `setArrow(id, options)`          | 设置连线的箭头方向/样式         | `id: string, options: Partial<ArrowConfig>`                     |
+| `getAnchorId(nodeId, positions)` | 获取指定节点上指定位置的锚点 ID | `nodeId: string, positions: AnchorPosition \| AnchorPosition[]` |
+
+**示例**：
+
+```typescript
+// 1. 修改节点标签
+SE.setLabel('node-xxx', '新节点名称');
+
+// 2. 修改连线标签
+SE.setLabel('connect-xxx', '新连线标签');
+
+// 3. 修改箭头方向
+SE.setArrow('connect-xxx', { direction: 'both' });
+
+// 4. 获取锚点 ID
+const ids = SE.getAnchorId('node-1', 'right');
+// ids = { right: 'anchor-xxx' }
+
+const multipleIds = SE.getAnchorId('node-1', ['top', 'bottom']);
+// multipleIds = { top: 'anchor-xxx', bottom: 'anchor-yyy' }
+
+// 5. 使用 getAnchorId 配合 addConnection
+const source = SE.getAnchorId('nodeA', 'right');
+const target = SE.getAnchorId('nodeB', 'left');
+if (source.right && target.left) {
+  SE.addConnection({
+    sourceAnchorId: source.right,
+    targetAnchorId: target.left,
+    connectorType: 'flowchart',
+  });
+}
+```
+
+---
+
+### `updateConnection` 详细用法
+
+更新连线的属性，支持修改 `stroke`、`strokeWidth`、`stub`、`gap`、`label`、`arrow` 等。
+
+```typescript
+// 修改连线颜色和宽度
+SE.updateConnection('connect-xxx', {
+  stroke: '#ff0000',
+  strokeWidth: 3,
+});
+
+// 修改标签文本
+SE.updateConnection('connect-xxx', {
+  label: { text: '新标签', fontSize: 16, color: '#333' },
+});
+
+// 修改箭头方向（保留其他箭头属性）
+SE.updateConnection('connect-xxx', {
+  arrow: { direction: 'both' },
+});
+
+// 重连（修改目标锚点）
+const newTarget = SE.getAnchorId('nodeC', 'top');
+if (newTarget.top) {
+  SE.updateConnection('connect-xxx', {
+    targetAnchorId: newTarget.top,
+  });
+}
+```
+
 ---
 
 ## 🧪 示例
