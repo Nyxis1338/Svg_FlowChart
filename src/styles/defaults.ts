@@ -39,8 +39,8 @@ export const Defaults = {
     connectorType: 'flowchart',
     stroke: '#27ae60', // 舒适绿色
     strokeWidth: 2,
-    selectedStroke: '#ff6622',
-    selectedStrokeWidth: 4,
+    selectedStroke: '#ff6b6b',
+    selectedStrokeWidth: 3,
     strokeLinecap: 'butt',
     strokeLinejoin: 'round',
     stub: 5,
