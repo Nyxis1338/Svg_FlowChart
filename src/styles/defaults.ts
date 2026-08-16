@@ -23,17 +23,6 @@ export const Defaults = {
   },
 
   /** 锚点默认样式 */
-  // anchor: {
-  //   radius: 5,
-  //   fill: '#ffffff',
-  //   stroke: '#5470c6', // 蓝紫色，保持与节点边框区分
-  //   strokeWidth: 2,
-  //   hoverStroke: '#ff6b6b',
-  //   hoverStrokeWidth: 3,
-  //   hoverRadiusMultiplier: 1.6,
-  //   hoverShadow: 'drop-shadow(0 0 8px rgba(255,107,107,0.5))',
-  // },
-
   anchor: {
     radius: 5,
     fill: '#ffffff',

@@ -19,17 +19,21 @@ var e = {
 		fill: "#ffffff",
 		stroke: "#5470c6",
 		strokeWidth: 2,
+		selectedStroke: "#ff6b6b",
+		selectedStrokeWidth: 3,
+		selectedRadiusMultiplier: 1.4,
+		selectedShadow: "drop-shadow(0 0 6px rgba(255,107,107,0.4))",
 		hoverStroke: "#ff6b6b",
 		hoverStrokeWidth: 3,
-		hoverRadiusMultiplier: 1.6,
-		hoverShadow: "drop-shadow(0 0 8px rgba(255,107,107,0.5))"
+		hoverRadiusMultiplier: 1.4,
+		hoverShadow: "drop-shadow(0 0 18px rgba(255,107,107,0.8)) drop-shadow(0 0 8px rgba(255,107,107,0.5))"
 	},
 	connection: {
 		connectorType: "flowchart",
 		stroke: "#27ae60",
 		strokeWidth: 2,
-		selectedStroke: "#ff6622",
-		selectedStrokeWidth: 4,
+		selectedStroke: "#ff6b6b",
+		selectedStrokeWidth: 3,
 		strokeLinecap: "butt",
 		strokeLinejoin: "round",
 		stub: 5,
@@ -897,7 +901,7 @@ var _ = class {
 		this.state === "idle" && (this.currentExecutor = new y(this), this.currentExecutor.start(e), this.bindDragEvents(), e.preventDefault());
 	}
 	startLinkDrag(e, t) {
-		this.state === "idle" && (this.store.findConnectionByAnchor(e.id) !== void 0 && this.store.isAnchorFull(e.id), this.currentExecutor = new x(this), this.currentExecutor.start(e, t), this.bindDragEvents(), t.preventDefault());
+		this.state === "idle" && (this.currentExecutor = new x(this), this.currentExecutor.start(e, t), this.bindDragEvents(), this.selection.select("anchor", e.id), t.preventDefault());
 	}
 	cancelDrag() {
 		this._cancelDrag();
@@ -1017,7 +1021,9 @@ var _ = class {
 			let u = this.store.getNodeAnchors(n.id);
 			for (let r of u) {
 				let i = this.store.calcAnchorPosForNode(n, r), a = g("circle"), o = r.radius ?? e.anchor.radius;
-				a.setAttribute("cx", String(i.x)), a.setAttribute("cy", String(i.y)), a.setAttribute("r", String(o)), a.style.cursor = "default", a.style.transition = "all 0.15s ease-out", a.dataset.anchorId = r.id, a.dataset.zIndex = String(t + 1), a.dataset.nodeId = n.id, a.setAttribute("fill", r.fill ?? e.anchor.fill), a.setAttribute("stroke", r.stroke ?? e.anchor.stroke), a.setAttribute("stroke-width", String(r.strokeWidth ?? e.anchor.strokeWidth)), this.elementLayer.appendChild(a);
+				a.setAttribute("cx", String(i.x)), a.setAttribute("cy", String(i.y)), a.style.cursor = "default", a.style.transition = "all 0.15s ease-out", a.dataset.anchorId = r.id, a.dataset.zIndex = String(t + 1), a.dataset.nodeId = n.id;
+				let s = this.selection.isSelected("anchor", r.id), c, l, u, d;
+				s ? (c = o * e.anchor.selectedRadiusMultiplier, l = e.anchor.selectedStroke, u = e.anchor.selectedStrokeWidth, d = e.anchor.selectedShadow) : (c = o, l = r.stroke ?? e.anchor.stroke, u = r.strokeWidth ?? e.anchor.strokeWidth, d = "none"), a.setAttribute("r", String(c)), a.setAttribute("stroke", l), a.setAttribute("stroke-width", String(u)), a.setAttribute("fill", r.fill ?? e.anchor.fill), a.setAttribute("filter", d), this.elementLayer.appendChild(a);
 			}
 		}
 	}
@@ -1028,6 +1034,9 @@ var _ = class {
 			if (n) {
 				let t = a * e.anchor.hoverRadiusMultiplier;
 				i.setAttribute("r", String(t)), i.setAttribute("stroke", e.anchor.hoverStroke), i.setAttribute("stroke-width", String(e.anchor.hoverStrokeWidth)), i.setAttribute("filter", e.anchor.hoverShadow);
+			} else if (this.selection.isSelected("anchor", t)) {
+				let t = a * e.anchor.selectedRadiusMultiplier;
+				i.setAttribute("r", String(t)), i.setAttribute("stroke", e.anchor.selectedStroke), i.setAttribute("stroke-width", String(e.anchor.selectedStrokeWidth)), i.setAttribute("filter", e.anchor.selectedShadow);
 			} else i.setAttribute("r", String(a)), i.setAttribute("stroke", r?.stroke ?? e.anchor.stroke), i.setAttribute("fill", r?.fill ?? e.anchor.fill), i.setAttribute("stroke-width", String(r?.strokeWidth ?? e.anchor.strokeWidth)), i.setAttribute("filter", "none");
 		}
 	}

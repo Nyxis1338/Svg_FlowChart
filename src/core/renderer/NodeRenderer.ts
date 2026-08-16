@@ -70,24 +70,6 @@ export class NodeRenderer {
 
       // ---- 锚点（独立添加，zIndex 比节点高 1） ----
       const anchors = this.store.getNodeAnchors(node.id);
-      // for (const ap of anchors) {
-      //   const pos = this.store.calcAnchorPosForNode(node, ap);
-      //   const circle = createSvgElement('circle') as SVGCircleElement;
-      //   const radius = ap.radius ?? Defaults.anchor.radius;
-      //   circle.setAttribute('cx', String(pos.x));
-      //   circle.setAttribute('cy', String(pos.y));
-      //   circle.setAttribute('r', String(radius));
-      //   circle.style.cursor = 'default';
-      //   circle.style.transition = 'all 0.15s ease-out';
-      //   circle.dataset['anchorId'] = ap.id;
-      //   circle.dataset['zIndex'] = String(nodeZ + 1);
-      //   circle.dataset['nodeId'] = node.id;
-
-      //   circle.setAttribute('fill', ap.fill ?? Defaults.anchor.fill);
-      //   circle.setAttribute('stroke', ap.stroke ?? Defaults.anchor.stroke);
-      //   circle.setAttribute('stroke-width', String(ap.strokeWidth ?? Defaults.anchor.strokeWidth));
-      //   this.elementLayer.appendChild(circle);
-      // }
       for (const ap of anchors) {
         const pos = this.store.calcAnchorPosForNode(node, ap);
         const circle = createSvgElement('circle') as SVGCircleElement;
@@ -144,11 +126,6 @@ export class NodeRenderer {
         circle.setAttribute('stroke-width', String(Defaults.anchor.hoverStrokeWidth));
         circle.setAttribute('filter', Defaults.anchor.hoverShadow);
       } else {
-        // circle.setAttribute('r', String(baseRadius));
-        // circle.setAttribute('stroke', ap?.stroke ?? Defaults.anchor.stroke);
-        // circle.setAttribute('fill', ap?.fill ?? Defaults.anchor.fill);
-        // circle.setAttribute('stroke-width', String(ap?.strokeWidth ?? Defaults.anchor.strokeWidth));
-        // circle.setAttribute('filter', 'none');
         // 取消高亮：恢复为普通状态（或选中状态，取决于是否选中）
         const isSelected = this.selection.isSelected('anchor', anchorId);
         if (isSelected) {
